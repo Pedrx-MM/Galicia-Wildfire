@@ -101,41 +101,38 @@ def get_mavlink_flags(estado, modo, armado, bateria):
         custom_mode = AC_STABILIZE
         sys_status  = MAV.MAV_STATE_STANDBY
     elif estado == "despegando":
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_GUIDED_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_GUIDED_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_ALT_HOLD
         sys_status  = MAV.MAV_STATE_ACTIVE
     elif estado == "aterrizando":
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_AUTO_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_AUTO_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_LAND
         sys_status  = MAV.MAV_STATE_ACTIVE
     elif estado == "volando" and modo == "auto":
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_AUTO_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_AUTO_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_AUTO
         sys_status  = MAV.MAV_STATE_ACTIVE
     elif estado == "volando" and modo == "rtl":
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_AUTO_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_AUTO_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_RTL
         sys_status  = MAV.MAV_STATE_ACTIVE
     elif estado == "volando" and modo in ("land", "emergency"):
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_AUTO_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_AUTO_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_LAND
         sys_status  = MAV.MAV_STATE_ACTIVE
     else:
-        base_mode   = (armed_flag |
-                       MAV.MAV_MODE_FLAG_STABILIZE_ENABLED |
+        base_mode   = (MAV.MAV_MODE_FLAG_STABILIZE_ENABLED |
                        MAV.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED)
         custom_mode = AC_LOITER
         sys_status  = MAV.MAV_STATE_ACTIVE if armado else MAV.MAV_STATE_STANDBY
+
+    # armed_flag se aplica siempre, independientemente del estado
+    base_mode |= armed_flag
 
     if bateria <= 10.0 and estado not in ("en_tierra",):
         sys_status = MAV.MAV_STATE_EMERGENCY
