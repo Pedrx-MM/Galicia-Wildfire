@@ -24,10 +24,15 @@ DB_NAME       = os.environ.get("DB_NAME", "galicia_wildfire")
 TICK_SEGUNDOS = float(os.environ.get("TICK_SEGUNDOS", "1"))
 SIM_DRONE_ID  = os.environ.get("SIM_DRONE_ID", "gw-sim-01")
 
-MAX_TRAIL     = 500
-LLEGADA_M     = 5.0
-BATERIA_CRIT  = 10.0
-VELOCIDAD_ASC = 5.0
+MAX_TRAIL      = 500
+LLEGADA_M      = 5.0
+BATERIA_CRIT   = 10.0
+VELOCIDAD_ASC  = 5.0
+ALTURA_HOVER   = 30.0   # m — altitude for hover after manual takeoff (no mission)
+RC_DEADBAND    = 80     # µs — ignore stick deviations smaller than this
+RC_VEL_SCALE   = 0.015  # m/s per µs deviation from 1500 centre
+RC_YAW_SCALE   = 0.10   # deg/s per µs deviation from 1500 centre
+VELOCIDAD_VERT = 3.0    # m/s — max manual vertical speed
 
 logging.basicConfig(
     level=logging.INFO,
@@ -117,29 +122,74 @@ def procesar_tick(db):
     # ── Máquina de estados ────────────────────────────────────────────────────
 
     if estado == "despegando":
-        if not waypoints:
-            log.warning("Despegando sin waypoints — cancelando")
-            upd_d["estado"] = "en_tierra"
-        else:
-            wp_crucero = next(
+        if waypoints:
+            wp_crucero         = next(
                 (w for w in waypoints if w.get("tipo") != "despegue"),
                 waypoints[0],
             )
-            alt_objetivo = max(float(wp_crucero.get("alt_m", 30.0)), 30.0)
-            alt_actual   = float(pos.get("alt_m", 0.0))
-            nueva_alt    = min(alt_actual + VELOCIDAD_ASC * TICK_SEGUNDOS, alt_objetivo)
-            upd_d["posicion"] = {**pos, "alt_m": nueva_alt}
-            log.info("Despegando: %.1fm → %.1fm (objetivo %.1fm)", alt_actual, nueva_alt, alt_objetivo)
-            if nueva_alt >= alt_objetivo:
-                log.info("✅ Despegue completado → volando")
-                upd_d["estado"] = "volando"
-                upd_d["modo"]   = "auto"
-                if waypoints and waypoints[0].get("tipo") == "despegue":
-                    wp_idx = 1
-                    upd_m["waypoint_actual"] = wp_idx
+            alt_objetivo       = max(float(wp_crucero.get("alt_m", 30.0)), ALTURA_HOVER)
+            modo_tras_despegue = "auto"
+        else:
+            alt_objetivo       = ALTURA_HOVER
+            modo_tras_despegue = "loiter"
+
+        alt_actual = float(pos.get("alt_m", 0.0))
+        nueva_alt  = min(alt_actual + VELOCIDAD_ASC * TICK_SEGUNDOS, alt_objetivo)
+        upd_d["posicion"] = {**pos, "alt_m": nueva_alt}
+        log.info("Despegando: %.1fm → %.1fm (objetivo %.1fm)", alt_actual, nueva_alt, alt_objetivo)
+        if nueva_alt >= alt_objetivo:
+            log.info("✅ Despegue completado → volando/%s", modo_tras_despegue)
+            upd_d["estado"] = "volando"
+            upd_d["modo"]   = modo_tras_despegue
+            if waypoints and waypoints[0].get("tipo") == "despegue":
+                wp_idx = 1
+                upd_m["waypoint_actual"] = wp_idx
 
     elif estado == "volando" and modo == "loiter":
-        log.info("Loiter — manteniendo posición")
+        rc    = drone.get("rc", {})
+        rumbo = float(drone.get("rumbo", 0.0))
+
+        roll_dev  = int(rc.get("roll",     1500)) - 1500
+        pitch_dev = int(rc.get("pitch",    1500)) - 1500
+        thr_val   = int(rc.get("throttle", 1500))
+        yaw_dev   = int(rc.get("yaw",      1500)) - 1500
+
+        roll_d  = 0.0 if abs(roll_dev)  < RC_DEADBAND else roll_dev  - math.copysign(RC_DEADBAND, roll_dev)
+        pitch_d = 0.0 if abs(pitch_dev) < RC_DEADBAND else pitch_dev - math.copysign(RC_DEADBAND, pitch_dev)
+        yaw_d   = 0.0 if abs(yaw_dev)   < RC_DEADBAND else yaw_dev   - math.copysign(RC_DEADBAND, yaw_dev)
+
+        # Rotate heading by yaw stick
+        rumbo = (rumbo + yaw_d * RC_YAW_SCALE * TICK_SEGUNDOS) % 360
+        upd_d["rumbo"] = rumbo
+
+        # Translate stick inputs into world-frame velocity
+        hdg_rad = math.radians(rumbo)
+        v_fwd   = -pitch_d * RC_VEL_SCALE   # negative pitch_dev = stick forward = fly forward
+        v_right =  roll_d  * RC_VEL_SCALE
+
+        v_north = v_fwd * math.cos(hdg_rad) - v_right * math.sin(hdg_rad)
+        v_east  = v_fwd * math.sin(hdg_rad) + v_right * math.cos(hdg_rad)
+
+        R = 6_371_000
+        d_lat = v_north * TICK_SEGUNDOS / R * (180.0 / math.pi)
+        d_lon = (v_east  * TICK_SEGUNDOS / R * (180.0 / math.pi)
+                 / math.cos(math.radians(pos["lat"])))
+
+        # Altitude: throttle 1500=hover, 2000=max climb, 1000=max descend
+        thr_norm  = (thr_val - 1500) / 500.0
+        alt_delta = thr_norm * VELOCIDAD_VERT * TICK_SEGUNDOS
+        alt_actual = float(pos.get("alt_m", 0.0))
+        nueva_alt  = max(0.0, alt_actual + alt_delta)
+
+        upd_d["posicion"] = {
+            "lat":   pos["lat"] + d_lat,
+            "lon":   pos["lon"] + d_lon,
+            "alt_m": nueva_alt,
+        }
+        log.info(
+            "Loiter RC: roll=%+d pitch=%+d thr=%d yaw=%+d → Δlat=%.6f Δlon=%.6f alt=%.1f→%.1f rumbo=%.0f°",
+            roll_dev, pitch_dev, thr_val, yaw_dev, d_lat, d_lon, alt_actual, nueva_alt, rumbo,
+        )
 
     elif estado == "volando" and modo == "rtl":
         rtl_target = drone.get("rtl_target")
@@ -232,8 +282,12 @@ def procesar_tick(db):
                 )
 
     elif estado == "en_tierra":
-        # Limpiar misiones activas residuales (reinicio del simulador)
-        pass
+        armado = bool(drone.get("armado", False))
+        rc     = drone.get("rc", {})
+        thr    = int(rc.get("throttle", 1000))
+        if armado and thr > 1600:
+            log.info("Throttle alto (ch3=%d) con armado → despegando", thr)
+            upd_d["estado"] = "despegando"
 
     # Persistir
     col_drones.update_one({"_id": SIM_DRONE_ID}, {"$set": upd_d})

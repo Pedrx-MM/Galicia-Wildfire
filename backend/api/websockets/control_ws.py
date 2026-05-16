@@ -125,13 +125,19 @@ async def control_ws_endpoint(ws: WebSocket, mav, cmds, mission_mgr=None, db=Non
                 await reply(True, "RTL activado")
 
             elif action == "rc_override":
-                ch = data.get("channels", {})
-                await cmds.rc_override(
-                    roll=int(ch.get("roll", 1500)),
-                    pitch=int(ch.get("pitch", 1500)),
-                    throttle=int(ch.get("throttle", 1500)),
-                    yaw=int(ch.get("yaw", 1500)),
-                )
+                ch       = data.get("channels", {})
+                roll     = int(ch.get("roll",     1500))
+                pitch    = int(ch.get("pitch",    1500))
+                throttle = int(ch.get("throttle", 1000))
+                yaw      = int(ch.get("yaw",      1500))
+                # Write RC to MongoDB so simulador-gw physics can apply them
+                await _sim_update(db, {"rc": {
+                    "roll":     roll,
+                    "pitch":    pitch,
+                    "throttle": throttle,
+                    "yaw":      yaw,
+                }})
+                await cmds.rc_override(roll=roll, pitch=pitch, throttle=throttle, yaw=yaw)
 
             elif action == "start_mission":
                 # 1. Armar + poner en despegue en MongoDB

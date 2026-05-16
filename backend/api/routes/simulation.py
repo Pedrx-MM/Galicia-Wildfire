@@ -84,6 +84,8 @@ async def restart_sitl(req: RestartAtRequest, request: Request):
         "consumo_w":         50.0,
         "bateria_max_wh":    40.0,
         "autonomia_min":     45,
+        "rumbo":             0.0,
+        "rc":                {"roll": 1500, "pitch": 1500, "throttle": 1000, "yaw": 1500},
         "actualizado_en":    now(),
     }
     await db["sim_drones"].replace_one(

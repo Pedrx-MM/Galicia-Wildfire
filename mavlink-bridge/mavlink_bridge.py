@@ -167,6 +167,11 @@ def send_telemetry(conn, drone):
     groundspeed = math.sqrt(vx ** 2 + vy ** 2)
     climb_rate  = -vz
 
+    # Use stored heading when drone is stationary (e.g. yaw-only rotation in loiter)
+    stored_rumbo = drone.get("rumbo")
+    if stored_rumbo is not None and groundspeed < 0.1:
+        _heading = float(stored_rumbo)
+
     base_mode, custom_mode, sys_status = get_mavlink_flags(estado, modo, armado, bateria)
     tb = time_boot_ms()
 
@@ -329,6 +334,8 @@ def main():
             "consumo_w":         50.0,
             "bateria_max_wh":    40.0,
             "autonomia_min":     45,
+            "rumbo":             0.0,
+            "rc":                {"roll": 1500, "pitch": 1500, "throttle": 1000, "yaw": 1500},
         })
         log.info("✅ sim_drone inicializado con ID=%s", SIM_DRONE_ID)
 
