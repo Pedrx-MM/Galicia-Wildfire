@@ -851,7 +851,13 @@ function initControlWS() {
 
 const _keysHeld = new Set();
 let   _rcLoopTimer = null;
-const RC_STEP = 200;   // µs offset desde center (1500 ± 200 = 1300–1700)
+// RC_STEP: offset desde 1500. Con throttle directo center=hover (1500±RC_STEP)
+const RC_STEP = 200;
+
+// Mode 2 keyboard layout:
+//   WASD     = right-stick equivalent → pitch (W/S) + roll (A/D)
+//   ← →      = left-stick X → yaw (girar)
+//   ↑ ↓      = left-stick Y → throttle directo (↑=subir/2000, centro=hover/1500, ↓=bajar/1000)
 
 function _startRCLoop() {
   if (_rcLoopTimer) return;
@@ -859,7 +865,11 @@ function _startRCLoop() {
     if (!ctrlWs) return;
     const roll     = _keysHeld.has('a') ? 1500 - RC_STEP : _keysHeld.has('d') ? 1500 + RC_STEP : 1500;
     const pitch    = _keysHeld.has('w') ? 1500 - RC_STEP : _keysHeld.has('s') ? 1500 + RC_STEP : 1500;
-    ctrlWs.sendRCOverride({ roll, pitch, throttle: 1500, yaw: 1500 });
+    const yaw      = _keysHeld.has('arrowleft')  ? 1500 - RC_STEP
+                   : _keysHeld.has('arrowright') ? 1500 + RC_STEP : 1500;
+    const throttle = _keysHeld.has('arrowup')   ? 1500 + RC_STEP
+                   : _keysHeld.has('arrowdown') ? 1500 - RC_STEP : 1500;
+    ctrlWs.sendRCOverride({ roll, pitch, throttle, yaw });
   }, 50);   // 20 Hz
 }
 
@@ -869,7 +879,7 @@ function _stopRCLoop() {
 }
 
 function initKeyboard() {
-  const MOVE_KEYS = new Set(['w', 'a', 's', 'd']);
+  const MOVE_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
 
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -898,8 +908,7 @@ function initKeyboard() {
   document.addEventListener('keyup', (e) => {
     const key = e.key.toLowerCase();
     _keysHeld.delete(key);
-    const anyMove = MOVE_KEYS.has(key) && [...MOVE_KEYS].some(k => _keysHeld.has(k));
-    if (!anyMove && MOVE_KEYS.has(key)) {
+    if (MOVE_KEYS.has(key) && ![...MOVE_KEYS].some(k => _keysHeld.has(k))) {
       ctrlWs?.sendRCOverride({ roll: 1500, pitch: 1500, throttle: 1500, yaw: 1500 });
       _stopRCLoop();
     }

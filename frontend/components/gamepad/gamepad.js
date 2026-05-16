@@ -1,16 +1,21 @@
 'use strict';
 /**
  * Galicia Wildfire — Gamepad Controller
- * Spec §8 — Mapeo Xbox / Nacon PC Controller → RC channels ArduPlane.
+ * Mapeo RC Mode 2 (estándar ArduCopter) para Xbox / Nacon PC Controller.
  *
  * Fix Nacon: el evento gamepadconnected en Chrome solo dispara cuando el usuario
  * pulsa un botón por primera vez. Añadimos scan periódico para detectar el mando
  * aunque ya esté conectado antes de abrir la página.
  *
- * Throttle combinado L2 + R2 (no spring-back, acumula delta).
+ * RC Mode 2 (estándar mundial ArduCopter):
+ *   Stick izquierdo  Y = Throttle ch3 (centro=hover, arriba=subir, abajo=bajar)
+ *   Stick izquierdo  X = Yaw      ch4 (girar)
+ *   Stick derecho    Y = Pitch     ch2 (adelante/atrás)
+ *   Stick derecho    X = Roll      ch1 (strafe izquierda/derecha)
+ *
  * Deadzone ±0.08, suavizado 0.7/0.3, polling 50 Hz.
- * D-pad: buttons[12-15] o axes[6/7] (HAT switch — varía por controlador).
- * Keyboard fallback activo siempre.
+ * D-pad: buttons[12-15] o axes[6/7] (HAT switch).
+ * Keyboard fallback activo siempre (WASD + flechas).
  */
 
 class GamepadController {
@@ -31,8 +36,8 @@ class GamepadController {
     this._scanTimer    = null;
     this._connected    = false;
 
-    // Estado RC (µs)
-    this._rc     = { ch1: 1500, ch2: 1500, ch3: 1000, ch4: 1500 };
+    // Estado RC (µs) — ch3 starts at 1500 (hover center for direct throttle)
+    this._rc     = { ch1: 1500, ch2: 1500, ch3: 1500, ch4: 1500 };
     this._rcPrev = { ...this._rc };
     this._smoothed    = {};
     this._prevButtons = {};
@@ -134,41 +139,26 @@ class GamepadController {
     const axes    = gp.axes;
     const buttons = gp.buttons;
 
-    // ── Ejes de vuelo ────────────────────────────────────────────────────────
-    // Mapeo estándar Xbox / Nacon (Standard Gamepad Mapping)
-    // ch1=aileron, ch2=elevator, ch3=throttle, ch4=rudder
-    const rollRaw  = this._dz(axes[0] ?? 0);
-    const pitchRaw = this._dz(axes[1] ?? 0);
-    const rudRaw   = this._dz(axes[2] ?? 0);
+    // ── RC Mode 2 — ejes de vuelo ────────────────────────────────────────────
+    // Stick izquierdo:  X=axes[0]→Yaw(ch4),  Y=axes[1]→Throttle(ch3)
+    // Stick derecho:    X=axes[2]→Roll(ch1),  Y=axes[3]→Pitch(ch2)
+    const yawRaw   = this._dz(axes[0] ?? 0);   // left  X → ch4 (girar)
+    const rollRaw  = this._dz(axes[2] ?? 0);   // right X → ch1 (strafe)
+    const pitchRaw = this._dz(axes[3] ?? 0);   // right Y → ch2 (adelante/atrás)
 
     const roll   = this._smooth('roll',  rollRaw);
     const pitch  = this._smooth('pitch', pitchRaw);
-    const rudder = this._smooth('rud',   rudRaw);
+    const yaw    = this._smooth('yaw',   yawRaw);
 
-    this._rc.ch1 = Math.round(1500 + roll   * 500);
-    this._rc.ch2 = Math.round(1500 + pitch  * 500);
-    this._rc.ch4 = Math.round(1500 + rudder * 500);
+    this._rc.ch1 = Math.round(1500 + roll  * 500);
+    this._rc.ch2 = Math.round(1500 + pitch * 500);
+    this._rc.ch4 = Math.round(1500 + yaw   * 500);
 
-    // ── Throttle L2 + R2 (spec §8.3) ─────────────────────────────────────────
-    // En Nacon: triggers suelen estar en axes[3]/axes[4] (0→-1 sin pulsar, 0→1 pulsado)
-    // En Xbox:  axes[4]=L2, axes[5]=R2 (-1 sin pulsar, 1 pulsado)
-    // Probamos ambos: si hay axes[5] y axes[4] usamos esos; si no, usamos axes[2]/axes[3]
-    let r2Raw, l2Raw;
-    if (axes.length >= 6) {
-      r2Raw = axes[5] ?? -1;
-      l2Raw = axes[4] ?? -1;
-    } else if (axes.length >= 5) {
-      r2Raw = axes[4] ?? -1;
-      l2Raw = axes[3] ?? -1;
-    } else {
-      // Triggers como buttons[7]/[6] (digital)
-      r2Raw = (buttons[7]?.pressed ? 1 : -1);
-      l2Raw = (buttons[6]?.pressed ? 1 : -1);
-    }
-    const r2 = this._smooth('r2', (r2Raw + 1) / 2);
-    const l2 = this._smooth('l2', (l2Raw + 1) / 2);
-    const thrDelta = (r2 - l2) * 500 * dt;
-    this._rc.ch3 = this._clamp(this._rc.ch3 + thrDelta, 1000, 2000);
+    // ── Throttle directo — stick izquierdo Y (center=hover) ──────────────────
+    // axes[1]: -1=arriba(subir) · 0=centro(hover) · +1=abajo(bajar)
+    // ch3=1500 = mantener altitud · >1500 = subir · <1500 = bajar
+    const thrRaw = this._smooth('thr', -(axes[1] ?? 0));   // invertir: arriba=+1
+    this._rc.ch3 = Math.round(this._clamp(1500 + thrRaw * 500, 1000, 2000));
 
     // ── D-pad (buttons[12-15] o HAT axes[6/7]) ───────────────────────────────
     const dpadUp    = (buttons[12]?.pressed) || (axes[7] !== undefined && axes[7] < -0.5);
@@ -256,9 +246,10 @@ class GamepadController {
     const K = this._keys;
     let changed = false;
 
-    const roll  = (K['KeyD'] ? 1 : 0) - (K['KeyA'] ? 1 : 0);
-    const pitch = (K['KeyS'] ? 1 : 0) - (K['KeyW'] ? 1 : 0);
-    const rud   = (K['ArrowRight'] ? 1 : 0) - (K['ArrowLeft'] ? 1 : 0);
+    // Mode 2: WASD = right-stick equivalent (roll+pitch), flechas = left-stick (yaw+throttle)
+    const roll  = (K['KeyD'] ? 1 : 0) - (K['KeyA'] ? 1 : 0);   // ch1 strafe
+    const pitch = (K['KeyS'] ? 1 : 0) - (K['KeyW'] ? 1 : 0);   // ch2 fwd/bck
+    const rud   = (K['ArrowRight'] ? 1 : 0) - (K['ArrowLeft'] ? 1 : 0);  // ch4 yaw
 
     const ch1 = Math.round(1500 + roll  * 400);
     const ch2 = Math.round(1500 + pitch * 400);
@@ -268,10 +259,11 @@ class GamepadController {
     if (ch2 !== this._rc.ch2) { this._rc.ch2 = ch2; changed = true; }
     if (ch4 !== this._rc.ch4) { this._rc.ch4 = ch4; changed = true; }
 
-    const thrUp   = K['ArrowUp']   || K['KeyE'] || K['Equal'];
-    const thrDown = K['ArrowDown'] || K['KeyQ'] || K['Minus'];
-    if (thrUp)   { this._rc.ch3 = this._clamp(this._rc.ch3 + 10, 1000, 2000); changed = true; }
-    if (thrDown) { this._rc.ch3 = this._clamp(this._rc.ch3 - 10, 1000, 2000); changed = true; }
+    // Throttle directo (center=hover): flecha arriba/E=subir, flecha abajo/Q=bajar, nada=hover
+    const ch3 = (K['ArrowUp'] || K['KeyE']) ? 1700
+              : (K['ArrowDown'] || K['KeyQ']) ? 1300
+              : 1500;
+    if (ch3 !== this._rc.ch3) { this._rc.ch3 = ch3; changed = true; }
 
     if (changed && !this._connected) {
       this._onRC({ ...this._rc });
