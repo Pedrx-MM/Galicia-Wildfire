@@ -30,9 +30,9 @@ BATERIA_CRIT   = 10.0
 VELOCIDAD_ASC  = 5.0
 ALTURA_HOVER   = 30.0   # m — altitude for hover after manual takeoff (no mission)
 RC_DEADBAND    = 80     # µs — ignore stick deviations smaller than this
-RC_VEL_SCALE   = 0.015  # m/s per µs deviation from 1500 centre
-RC_YAW_SCALE   = 0.10   # deg/s per µs deviation from 1500 centre
-VELOCIDAD_VERT = 3.0    # m/s — max manual vertical speed
+RC_VEL_SCALE   = 0.08   # m/s per µs deviation → full stick ≈ 33 m/s (~120 km/h)
+RC_YAW_SCALE   = 0.20   # deg/s per µs deviation → full stick ≈ 84 °/s
+VELOCIDAD_VERT = 8.0    # m/s — max manual vertical speed
 
 logging.basicConfig(
     level=logging.INFO,
