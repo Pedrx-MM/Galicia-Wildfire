@@ -790,3 +790,276 @@ Al revisar el código existente se confirmó que las fases 6 (motor de fuego), 7
 ### 14.5 Fuentes de delay — sin impacto en Phase 10
 
 Ninguno de los cambios de Phase 10 toca el path crítico de telemetría/RC. Los sonidos y efectos visuales son puramente client-side y no añaden latencia al loop de control.
+
+---
+
+## 15. Sesiones 2026-05-16 — ArduCopter Docker Bridge + RC manual completo
+
+**Fecha:** 2026-05-16  
+**Objetivo:** Sustituir el SITL ArduPlane/WSL2 por una arquitectura Docker pura con simulador físico en MongoDB, implementar ARM correcto, control RC manual Mode 2 y ajuste de velocidades para demo.
+
+### 15.1 Arquitectura final adoptada
+
+```
+MongoDB (sim_drones) ←→ simulador-gw (tick 1 Hz)
+       ↑                        ↑ RC channels (via control_ws)
+       └── mavlink-bridge → UDP:14550 → backend FastAPI → /ws/telemetry → frontend
+                                              ↑
+                                         /ws/control ← gamepad RC override
+```
+
+**5 contenedores Docker:**
+
+| Servicio | Imagen | Función |
+|---------|--------|---------|
+| `gw-mongo` | mongo:7 | Estado del dron + misiones |
+| `gw-simulador` | simulador-gw | Física: posición, batería, estados |
+| `gw-mavlink-bridge` | mavlink-bridge | MongoDB → MAVLink UDP |
+| `gw-backend` | backend | FastAPI REST + WebSockets |
+| `gw-mongo-express` | mongo-express | Admin BD (opcional) |
+
+### 15.2 Bugs resueltos
+
+| ID | Síntoma | Causa | Fix |
+|----|---------|-------|-----|
+| ARM-001 | ARM enviado pero no confirmado en 6s | `get_mavlink_flags()` no aplicaba `MAV_MODE_FLAG_SAFETY_ARMED` (0x80) en estado `en_tierra` | Mover `base_mode \|= armed_flag` fuera de todas las ramas, al final de la función |
+| RC-001 | Gamepad mueve throttle y yaw, no posición | Axes mapeados con stick izquierdo=pitch+roll, derecho=yaw (no estándar) | Remap a RC Mode 2 (izq=throttle+yaw, der=pitch+roll) |
+| DESP-001 | Despegando sin misión cancela inmediatamente | `if not waypoints: upd_d["estado"] = "en_tierra"` | Subir a `ALTURA_HOVER=30m` → loiter si no hay misión |
+
+### 15.3 Archivos modificados y su función actual
+
+| Archivo | Cambios clave |
+|---------|--------------|
+| `mavlink-bridge/mavlink_bridge.py` | Fix armed_flag; inicializa `rumbo` y `rc` en doc; usa `rumbo` como heading fallback cuando groundspeed<0.1 |
+| `simulador-gw/simulador.py` | RC Mode 2 physics (loiter), throttle trigger en tierra, fix despegando sin misión, constantes de velocidad |
+| `backend/api/websockets/control_ws.py` | `rc_override` escribe `rc: {roll,pitch,throttle,yaw}` en MongoDB además de enviar MAVLink |
+| `backend/api/routes/simulation.py` | `restart-at` inicializa campos `rumbo=0.0` y `rc={...}` |
+| `frontend/components/gamepad/gamepad.js` | RC Mode 2: left X=yaw, left Y=throttle directo, right X=roll, right Y=pitch |
+| `frontend/pages/simulator/simulator.js` | Keyboard Mode 2: ←→=yaw, ↑↓=throttle directo, WASD=pitch+roll |
+
+### 15.4 Constantes de velocidad actuales (`simulador-gw/simulador.py`)
+
+```python
+RC_VEL_SCALE   = 0.08   # m/s por µs de desvío → full stick ≈ 33 m/s (~120 km/h)
+RC_YAW_SCALE   = 0.20   # deg/s por µs → full stick ≈ 84 °/s
+VELOCIDAD_VERT = 8.0    # m/s máximo en manual vertical
+VELOCIDAD_ASC  = 5.0    # m/s de ascenso/descenso automático (despegue/aterrizaje)
+```
+
+### 15.5 Flujo RC Mode 2 (implementado)
+
+```
+Gamepad poll (50 Hz)
+  axes[0] → ch4 (yaw,    left  X)
+  axes[1] → ch3 (thr,    left  Y,  center=1500=hover)
+  axes[2] → ch1 (roll,   right X)
+  axes[3] → ch2 (pitch,  right Y)
+         ↓ onRC callback
+simulator.js → sendRCOverride({roll,pitch,throttle,yaw})
+         ↓ WebSocket /ws/control
+control_ws.py → MongoDB sim_drones.rc + MAVLink RC_CHANNELS_OVERRIDE
+         ↓ 1 Hz tick
+simulador-gw → lee rc → aplica física (velocidad world-frame)
+         ↓
+mavlink-bridge → lee posición → genera GLOBAL_POSITION_INT → UDP:14550
+         ↓
+backend → /ws/telemetry → frontend marker + HUD
+```
+
+---
+
+## 16. Backlog pre-demo — Mejoras pendientes
+
+> **Orden sugerido:** de más impacto/sencillo a más complejo.  
+> Cada ítem indica exactamente qué archivo y qué cambiar.
+
+---
+
+### DEMO-01 — Incrementar más la velocidad de vuelo manual
+
+**Prioridad:** Alta  
+**Estado:** ⬜ Pendiente
+
+**Archivo:** `simulador-gw/simulador.py` — líneas 33-35
+
+```python
+# Valores actuales
+RC_VEL_SCALE   = 0.08   # → full stick ≈ 33 m/s
+RC_YAW_SCALE   = 0.20   # → full stick ≈ 84 °/s
+VELOCIDAD_VERT = 8.0    # m/s vertical
+
+# Sugerencia para demo muy dinámica
+RC_VEL_SCALE   = 0.15   # → full stick ≈ 63 m/s (~225 km/h)
+RC_YAW_SCALE   = 0.30   # → full stick ≈ 126 °/s
+VELOCIDAD_VERT = 12.0   # m/s vertical
+```
+
+**Cómo aplicar:** cambiar los tres valores → `docker compose up -d --build simulador-gw`.  
+**Nota:** Con TICK=1s el dron salta posiciones enteras cada segundo. Si el movimiento se ve a trompicones, reducir también `TICK_SEGUNDOS` en `docker-compose.yml` (env var del servicio `simulador`) a `0.5` o `0.25`. Afecta también a la velocidad de las misiones automáticas (escala proporcionalmente).
+
+---
+
+### DEMO-02 — Reducir la propagación del fuego
+
+**Prioridad:** Alta  
+**Estado:** ⬜ Pendiente
+
+El fuego se propaga demasiado rápido para gestionar en demo. Dos knobs:
+
+**Archivo 1:** `backend/game/fire_spread.py`
+
+```python
+DIFFICULTY_PARAMS = {
+    "muy alta": {"p_factor": 1.70, "spread_step": 6},
+    "alta":     {"p_factor": 1.30, "spread_step": 8},
+    "media":    {"p_factor": 1.00, "spread_step": 10},   # ← subir a 20-30
+    "baja":     {"p_factor": 0.75, "spread_step": 12},   # ← subir a 30-45
+}
+```
+
+`spread_step` es el intervalo en segundos entre pasos de propagación. Subir a `25-40` en Media y añadir una dificultad "Demo":
+
+```python
+"demo": {"p_factor": 0.40, "spread_step": 45},   # fuego casi estático
+```
+
+**Archivo 2:** `frontend/pages/planning/planning.js`  
+Añadir "Demo" como opción de dificultad en el selector del panel lateral.
+
+**Reconstruir:** solo `backend` — `docker compose up -d --build backend`.
+
+---
+
+### DEMO-03 — Aumentar zoom inicial del mapa en simulador
+
+**Prioridad:** Media  
+**Estado:** ⬜ Pendiente
+
+**Archivo:** `frontend/pages/simulator/simulator.js` — función `initMap()` (~línea 127)
+
+```javascript
+// Actual
+mapgl = new maplibregl.Map({
+  zoom: 13,
+  pitch: 45,
+  bearing: -15,
+  ...
+});
+
+// Para demo (más cerca del terreno, más impresionante)
+mapgl = new maplibregl.Map({
+  zoom: 15,       // ← subir de 13 a 15
+  pitch: 55,      // ← más inclinado para ver terreno 3D
+  bearing: -20,
+  ...
+});
+```
+
+No requiere rebuild Docker — es frontend estático. Basta recargar el navegador (Ctrl+F5).
+
+---
+
+### DEMO-04 — Rediseñar marcador del dron principal (Predator → Quadcóptero)
+
+**Prioridad:** Media  
+**Estado:** ⬜ Pendiente
+
+El marcador actual es un MQ-9 Predator de ala fija. Para coherencia con ArduCopter simulado, cambiarlo por un quadcóptero.
+
+**Archivo:** `frontend/pages/simulator/simulator.js` — constante `PREDATOR_SVG` (~línea 331)
+
+Sustituir el SVG completo por un quadcóptero top-down con 4 brazos + rotores. Ejemplo de estructura:
+
+```svg
+<svg viewBox="0 0 100 100" width="80" height="80">
+  <!-- Cuerpo central hexagonal -->
+  <!-- 4 brazos diagonales (±45°) -->
+  <!-- 4 discos de rotor con hélice -->
+  <!-- LED frontal -->
+  <!-- Landing gear lines -->
+</svg>
+```
+
+No requiere rebuild — frontend estático. Recargar navegador.
+
+---
+
+### DEMO-05 — Mejorar skin drones del enjambre (puntos → quadcópteros)
+
+**Prioridad:** Media  
+**Estado:** ⬜ Pendiente
+
+Los drones cisterna del swarm se renderizan como círculos simples en el mapa.
+
+**Archivo:** `frontend/components/swarm/swarm.js` (o similar — buscar con `grep -r "circle" frontend/components/swarm/`)
+
+**Objetivo:** Sustituir el marcador de círculo por un SVG de quadcóptero pequeño (15×15px), similar al DEMO-04 pero más pequeño y con color diferente (azul agua vs gris reconocimiento).
+
+Pasos:
+1. Localizar dónde se crea el marcador del swarm (probablemente `new maplibregl.Marker({element: el})`)
+2. Crear el elemento `el` con un SVG inline de quadcóptero cisterna
+3. Añadir clases CSS para animar los rotores (opacity pulse o rotate)
+
+No requiere rebuild — frontend estático.
+
+---
+
+### DEMO-06 — Aumentar velocidad de pasadas del enjambre
+
+**Prioridad:** Baja-Media  
+**Estado:** ⬜ Pendiente
+
+Las pasadas boustrophedon del enjambre se ven lentas.
+
+**Archivo:** `backend/game/swarm.py` (o donde se calcule la velocidad de los drones cisterna)
+
+Buscar la constante de velocidad del enjambre (probablemente algo como `SWARM_SPEED_MS` o `drone_speed`). Aumentar de ~10 m/s a ~25-30 m/s.
+
+También revisar el intervalo de actualización de posición del enjambre (ticker del broadcaster en `backend`). Si hay un sleep entre updates, reducirlo.
+
+**Reconstruir:** `docker compose up -d --build backend` si está en Python.
+
+---
+
+### DEMO-07 — Movimiento más fluido (reducir TICK del simulador)
+
+**Prioridad:** Baja  
+**Estado:** ⬜ Pendiente
+
+Con TICK=1s el dron actualiza posición 1 vez/segundo, lo que produce movimiento a saltos visibles a velocidades altas.
+
+**Archivo:** `docker-compose.yml` — env del servicio `simulador`
+
+```yaml
+simulador:
+  environment:
+    - TICK_SEGUNDOS=0.25   # 4 Hz en vez de 1 Hz
+```
+
+**Efecto colateral:** A 4 Hz, el simulador hace 4× más escrituras en MongoDB. Con Mongo en local no es problema. La batería se consumirá 4× más rápido **a menos que** la física ya escale por `TICK_SEGUNDOS` (lo hace: `consumo_por_tick` y `mover_hacia` usan `TICK_SEGUNDOS` como factor).
+
+**Verificar** que `mavlink-bridge` también lee más frecuente (tiene su propio `TICK_SEGUNDOS`):
+
+```yaml
+mavlink-bridge:
+  environment:
+    - TICK_SEGUNDOS=0.25
+```
+
+**Reconstruir:** `docker compose up -d --build simulador-gw mavlink-bridge`.
+
+---
+
+### Tabla resumen de pendientes
+
+| ID | Mejora | Impacto demo | Dificultad | Rebuild |
+|----|--------|-------------|------------|---------|
+| DEMO-01 | Más velocidad vuelo manual | ★★★ | Trivial (1 línea) | `simulador-gw` |
+| DEMO-02 | Fuego más lento | ★★★ | Fácil (1-2 líneas) | `backend` |
+| DEMO-03 | Más zoom mapa | ★★ | Trivial (1 número) | No (estático) |
+| DEMO-04 | Quadcóptero en vez de Predator | ★★ | Media (SVG nuevo) | No (estático) |
+| DEMO-05 | Swarm con SVG quadcóptero | ★★ | Media (SVG + CSS) | No (estático) |
+| DEMO-06 | Enjambre más rápido | ★ | Fácil | `backend` |
+| DEMO-07 | Movimiento fluido (TICK 0.25s) | ★★ | Fácil (env var) | `simulador-gw` + `bridge` |
+
+*Última actualización: 2026-05-16*
