@@ -1,0 +1,944 @@
+/* ============================================================
+   GALICIA WILDFIRE — HUD (Operations Console)
+   Spec §13 — CSS puro sobre el mapa, sin canvas.
+   Sistema de tres niveles de jerarquía + corner brackets + micro-IDs.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --color-hud-green:  #00ff88;
+  --color-hud-amber:  #f2a623;
+  --color-hud-red:    #ff4444;
+  --color-hud-blue:   #3bb8e0;
+  --color-hud-cyan:   #00bfff;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* Jerarquía de paneles */
+  --panel-bg-primary:   rgba(8, 10, 10, 0.82);
+  --panel-bg-secondary: rgba(10, 12, 12, 0.72);
+  --panel-bg-tertiary:  rgba(12, 14, 14, 0.60);
+  --panel-border-primary:   rgba(0, 255, 136, 0.22);
+  --panel-border-secondary: rgba(255, 255, 255, 0.10);
+  --panel-border-tertiary:  rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Panel base ─────────────────────────────────────────────── */
+.hud-panel {
+  position: absolute;
+  background: var(--panel-bg-secondary);
+  border: 1px solid var(--panel-border-secondary);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  color: var(--color-hud-green);
+  font-size: 14px;
+  line-height: 1.7;
+  user-select: none;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-panel.interactive { pointer-events: auto; }
+
+/* Micro-ID de panel (esquina sup-izq) ─ aparece en paneles con [data-panel-id] */
+.hud-panel[data-panel-id]::before {
+  content: attr(data-panel-id);
+  position: absolute;
+  top: -6px;
+  left: 10px;
+  padding: 0 6px;
+  background: #0a0c0c;
+  color: rgba(0, 255, 136, 0.55);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  border: 1px solid var(--panel-border-secondary);
+  border-radius: 2px;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+/* ─── Corner brackets — paneles nivel primario ───────────────── */
+.hud-panel.primary {
+  background: var(--panel-bg-primary);
+  border-color: var(--panel-border-primary);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.3),
+    0 8px 24px rgba(0,0,0,0.45),
+    0 0 24px rgba(0, 255, 136, 0.05);
+}
+
+.hud-panel.primary::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: 4px;
+  background:
+    linear-gradient(to right,  var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) top left    / 10px 1px  no-repeat,
+    linear-gradient(to bottom, var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) top left    / 1px 10px  no-repeat,
+    linear-gradient(to left,   var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) top right   / 10px 1px  no-repeat,
+    linear-gradient(to bottom, var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) top right   / 1px 10px  no-repeat,
+    linear-gradient(to right,  var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) bottom left / 10px 1px  no-repeat,
+    linear-gradient(to top,    var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) bottom left / 1px 10px  no-repeat,
+    linear-gradient(to left,   var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) bottom right/ 10px 1px  no-repeat,
+    linear-gradient(to top,    var(--color-hud-green) 0, var(--color-hud-green) 10px, transparent 10px) bottom right/ 1px 10px  no-repeat;
+  opacity: 0.65;
+}
+
+/* Paneles terciarios — pill plana */
+.hud-panel.tertiary {
+  background: var(--panel-bg-tertiary);
+  border-color: var(--panel-border-tertiary);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PANEL SUPERIOR IZQUIERDO — telemetría primaria
+   ═══════════════════════════════════════════════════════════════════ */
+.hud-topleft {
+  top: 24px;
+  left: 24px;
+  min-width: 216px;
+  padding: 14px 18px 12px;
+  line-height: 1.55;
+}
+
+.hud-topleft .hud-row {
+  display: flex;
+  align-items: baseline;
+  border-bottom: 1px dashed rgba(0,255,136,0.08);
+  padding: 2px 0;
+}
+.hud-topleft .hud-row:last-child { border-bottom: none; }
+
+.hud-label {
+  font-size: 10px;
+  color: rgba(0, 255, 136, 0.5);
+  letter-spacing: 0.18em;
+  width: 46px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.hud-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-hud-green);
+  text-shadow: 0 0 8px rgba(0,255,136,0.35);
+  min-width: 60px;
+  flex: 1;
+  text-align: right;
+  letter-spacing: 0.02em;
+}
+
+.hud-unit {
+  font-size: 9px;
+  color: rgba(0, 255, 136, 0.45);
+  margin-left: 6px;
+  letter-spacing: 0.1em;
+  width: 42px;
+  text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PANEL SUPERIOR DERECHO — Horizonte artificial
+   ═══════════════════════════════════════════════════════════════════ */
+.hud-topright {
+  top: 24px;
+  right: 24px;
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.attitude-ring {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    inset 0 0 20px rgba(0,0,0,0.5),
+    0 0 18px rgba(0,0,0,0.45);
+}
+
+.attitude-inner {
+  position: absolute;
+  inset: -40%;
+  width: 180%;
+  height: 180%;
+  background: linear-gradient(
+    to bottom,
+    #1a4a8a 0%,
+    #2a6aba 50%,
+    #5a3a1a 50%,
+    #3a2210 100%
+  );
+  transform-origin: center center;
+}
+
+/* Ticks de pitch sobre el horizonte */
+.attitude-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* líneas horizontales cada ~10° (en px relativos al contenedor 180%) */
+    linear-gradient(to right, transparent 46%, rgba(255,255,255,0.55) 46%, rgba(255,255,255,0.55) 54%, transparent 54%);
+  background-size: 100% 13px;
+  background-position: 0 50%;
+  mask-image: linear-gradient(to bottom, transparent 20%, black 45%, black 55%, transparent 80%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 20%, black 45%, black 55%, transparent 80%);
+  opacity: 0.35;
+}
+
+.attitude-horizon-line {
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 1.5px;
+  background: rgba(255,255,255,0.85);
+  transform: translateY(-50%);
+  box-shadow: 0 0 4px rgba(255,255,255,0.4);
+}
+
+.attitude-cross {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.attitude-cross::before,
+.attitude-cross::after {
+  content: '';
+  position: absolute;
+  background: var(--color-hud-amber);
+  box-shadow: 0 0 6px rgba(242,166,35,0.6);
+}
+
+.attitude-cross::before { width: 36px; height: 2px; }
+.attitude-cross::after  { width: 2px; height: 18px; }
+
+/* Cuña indicadora (chevron amarillo centrado) */
+.attitude-ring::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px; height: 10px;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  border-left: 2px solid var(--color-hud-amber);
+  border-right: 2px solid var(--color-hud-amber);
+  border-top: none;
+  border-bottom: none;
+  clip-path: polygon(0 0, 30% 100%, 70% 100%, 100% 0);
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.8;
+}
+
+/* Marca superior de "0°" del roll */
+.attitude-ring::after {
+  content: '▼';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--color-hud-amber);
+  font-size: 10px;
+  line-height: 1;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.attitude-labels {
+  display: flex;
+  gap: 14px;
+  font-size: 10px;
+  color: rgba(0, 255, 136, 0.75);
+  letter-spacing: 0.08em;
+}
+
+.attitude-labels span > span {
+  color: var(--color-hud-green);
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPASS TAPE — cinta de rumbo superior (nueva)
+   ═══════════════════════════════════════════════════════════════════ */
+.compass-tape {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560px;
+  height: 46px;
+  background: var(--panel-bg-primary);
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.45),
+    0 0 20px rgba(0, 255, 136, 0.05);
+}
+
+/* Corner brackets mini */
+.compass-tape::before,
+.compass-tape::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  border: 1.5px solid var(--color-hud-green);
+  opacity: 0.7;
+}
+.compass-tape::before { top: 3px; left: 3px; border-right: none; border-bottom: none; }
+.compass-tape::after  { top: 3px; right: 3px; border-left: none;  border-bottom: none; }
+
+.compass-tape-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 6px;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+
+#compassTapeStrip {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  display: flex;
+  flex-direction: row;
+  /* transform se aplica por JS según heading */
+  transform: translateX(0);
+  will-change: transform;
+}
+
+/* Cada tick representa 5° de heading = 40px (COMPASS_PX_PER_DEG=8) */
+.compass-tick {
+  position: relative;
+  width: 40px;
+  height: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(0, 255, 136, 0.5);
+}
+.compass-tick::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  height: 5px;
+  background: rgba(0, 255, 136, 0.4);
+}
+.compass-tick.major {
+  height: 26px;
+  color: rgba(0, 255, 136, 0.85);
+  font-weight: 700;
+  font-size: 11px;
+}
+.compass-tick.major::before {
+  height: 10px;
+  background: rgba(0, 255, 136, 0.85);
+  width: 1.5px;
+}
+.compass-tick.cardinal {
+  color: var(--color-hud-amber);
+}
+.compass-tick.cardinal::before {
+  background: var(--color-hud-amber);
+  box-shadow: 0 0 5px rgba(242,166,35,0.65);
+}
+
+/* Índice central (triángulo amarillo apuntando hacia abajo) */
+.compass-index {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid var(--color-hud-amber);
+  filter: drop-shadow(0 0 4px rgba(242,166,35,0.7));
+  z-index: 3;
+}
+.compass-center-line {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--color-hud-amber) 0%, transparent 80%);
+  opacity: 0.4;
+  z-index: 2;
+}
+
+/* Indicador del viento en la cinta (pip naranja) */
+.compass-wind-pip {
+  position: absolute;
+  top: 4px;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--color-accent-fire);
+  transform: translateX(-50%);
+  transition: left 0.6s ease;
+  z-index: 2;
+  filter: drop-shadow(0 0 3px rgba(232,93,36,0.65));
+}
+
+/* Label current heading (encima del índice) */
+.compass-heading-label {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #0a0a0a;
+  background: var(--color-hud-amber);
+  border-radius: 2px;
+  z-index: 4;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAPES verticales de ALTITUD (izq del horizonte) y VELOCIDAD (dcha)
+   ═══════════════════════════════════════════════════════════════════ */
+.vtape {
+  position: absolute;
+  top: 88px;
+  width: 46px;
+  height: 200px;
+  background: var(--panel-bg-primary);
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 3px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: none;
+}
+.vtape-alt   { right: 148px; }
+.vtape-speed { right: 248px; }
+
+/* Ticks internos */
+.vtape-track {
+  position: absolute;
+  inset: 0;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+}
+.vtape-strip {
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(0);
+  will-change: transform;
+}
+.vtape-tick {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 22px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(0,255,136,0.45);
+  position: relative;
+}
+.vtape-tick::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px; height: 1px;
+  background: rgba(0,255,136,0.4);
+}
+.vtape-tick.major {
+  color: rgba(0,255,136,0.85);
+  font-weight: 700;
+  font-size: 10px;
+}
+.vtape-tick.major::before {
+  width: 12px;
+  background: rgba(0,255,136,0.75);
+  height: 1.5px;
+}
+
+/* Etiqueta del título del tape */
+.vtape-title {
+  position: absolute;
+  top: 3px;
+  left: 0; right: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: rgba(0,255,136,0.65);
+  z-index: 3;
+  background: linear-gradient(to bottom, var(--panel-bg-primary) 70%, transparent 100%);
+  padding: 2px 0 4px;
+}
+
+/* Valor actual en caja central */
+.vtape-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 44px;
+  padding: 4px 6px;
+  background: #0a0c0c;
+  border: 1.5px solid var(--color-hud-amber);
+  color: var(--color-hud-amber);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  z-index: 4;
+  box-shadow: 0 0 10px rgba(242,166,35,0.35);
+  border-radius: 2px;
+}
+
+/* Flecha indicadora lateral (apuntando al valor central) */
+.vtape-alt .vtape-value::before,
+.vtape-speed .vtape-value::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 0; height: 0;
+  transform: translateY(-50%);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+.vtape-alt .vtape-value::before {
+  right: -8px;
+  border-left: 6px solid var(--color-hud-amber);
+}
+.vtape-speed .vtape-value::before {
+  left: -8px;
+  border-right: 6px solid var(--color-hud-amber);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THROTTLE BAR (vertical, izquierda)
+   ═══════════════════════════════════════════════════════════════════ */
+.throttle-bar {
+  position: absolute;
+  top: 260px;
+  left: 24px;
+  width: 22px;
+  height: 140px;
+  background: var(--panel-bg-primary);
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 3px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden;
+}
+.throttle-label {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: rgba(0, 255, 136, 0.6);
+  padding: 0 5px;
+  background: #0a0c0c;
+  white-space: nowrap;
+}
+.throttle-fill {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 50%;
+  background: linear-gradient(to top, #00ff88 0%, #00bf66 70%, #e85d24 100%);
+  transition: height 0.2s ease;
+  box-shadow: 0 0 8px rgba(0,255,136,0.35);
+}
+.throttle-ticks {
+  position: absolute;
+  top: 4px;
+  right: -14px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: rgba(0,255,136,0.4);
+}
+.throttle-value {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-hud-green);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MISSION STATUS BAR (inferior central)
+   ═══════════════════════════════════════════════════════════════════ */
+.hud-bottom {
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  min-width: 560px;
+  background: var(--panel-bg-primary);
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 4px;
+  box-shadow:
+    0 8px 28px rgba(0,0,0,0.55),
+    0 0 20px rgba(0, 255, 136, 0.06);
+}
+.hud-bottom::before {
+  content: 'FCU-01 · FLIGHT CTRL';
+  position: absolute;
+  top: -9px;
+  left: 14px;
+  padding: 1px 7px;
+  background: #0a0c0c;
+  color: rgba(0, 255, 136, 0.7);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 2px;
+}
+
+.mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  border: 1px solid rgba(255,255,255,0.15);
+  min-width: 110px;
+  justify-content: center;
+}
+
+.mode-badge .mode-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.mode-badge.mode-fbwa,
+.mode-badge.mode-fly_by_wire_a,
+.mode-badge.mode-fly_by_wire_b,
+.mode-badge.mode-fbwb,
+.mode-badge.mode-cruise,
+.mode-badge.mode-stabilize { color: #1aff5a; border-color: rgba(26,255,90,0.4); background: rgba(26,122,26,0.22); }
+
+.mode-badge.mode-loiter     { color: #5ab4ff; border-color: rgba(90,180,255,0.4); background: rgba(26,90,154,0.22); }
+
+.mode-badge.mode-rtl,
+.mode-badge.mode-auto,
+.mode-badge.mode-guided     { color: var(--color-hud-amber); border-color: rgba(242,166,35,0.4); background: rgba(154,90,0,0.22); }
+
+.mode-badge.mode-manual,
+.mode-badge.mode-acro       { color: var(--color-hud-red); border-color: rgba(255,68,68,0.4); background: rgba(154,26,26,0.22); }
+
+.mode-badge.mode-takeoff    { color: #00bfff; border-color: rgba(0,191,255,0.4); background: rgba(0,80,120,0.22); }
+
+.arm-badge {
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  border: 1px solid;
+  min-width: 110px;
+  text-align: center;
+}
+
+.arm-badge.armed    { color: #1aff5a; border-color: rgba(26,255,90,0.5); background: rgba(26,122,26,0.22); }
+.arm-badge.disarmed { color: var(--color-hud-red); border-color: rgba(255,68,68,0.45); background: rgba(154,26,26,0.18); }
+
+.hud-sep {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, rgba(0,255,136,0.35), transparent);
+}
+
+.hud-btn {
+  padding: 6px 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.7);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.08s;
+  pointer-events: auto;
+  position: relative;
+}
+
+.hud-btn:hover { border-color: rgba(0,255,136,0.5); color: #fff; background: rgba(0,255,136,0.08); }
+.hud-btn.btn-arm    { border-color: rgba(26,255,90,0.4);  color: #1aff5a; }
+.hud-btn.btn-arm:hover { background: rgba(26,255,90,0.12); }
+.hud-btn.btn-disarm { border-color: rgba(255,68,68,0.4);  color: var(--color-hud-red); }
+.hud-btn.btn-disarm:hover { background: rgba(255,68,68,0.12); }
+.hud-btn.btn-mission { border-color: rgba(59,184,224,0.5); color: #3bb8e0; font-weight: 700; }
+.hud-btn.btn-mission:hover { background: rgba(59,184,224,0.12); }
+.hud-btn.btn-mission.active { background: rgba(59,184,224,0.18); animation: mission-pulse 1.5s ease-in-out infinite; }
+@keyframes mission-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,184,224,0); } 50% { box-shadow: 0 0 8px 2px rgba(59,184,224,0.35); } }
+.hud-btn:active { transform: scale(0.95); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BANNERS
+   ═══════════════════════════════════════════════════════════════════ */
+.gamepad-banner {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  padding: 8px 18px;
+  border-radius: 4px;
+  background: rgba(30, 20, 0, 0.92);
+  border: 1px solid rgba(232, 160, 32, 0.55);
+  color: #e8a020;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+.gamepad-banner.hidden { opacity: 0; pointer-events: none; }
+
+.gamepad-scan-btn {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border: 1px solid rgba(232,160,32,0.55);
+  border-radius: 3px;
+  background: rgba(232,160,32,0.12);
+  color: #e8a020;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.15s;
+}
+.gamepad-scan-btn:hover { background: rgba(232,160,32,0.25); }
+
+.ws-banner {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  padding: 7px 14px;
+  border-radius: 4px;
+  background: rgba(28, 0, 0, 0.92);
+  border: 1px solid rgba(192, 57, 43, 0.6);
+  color: #ff4444;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.ws-banner.hidden { opacity: 0; }
+
+/* ─── LED del dron cuando armado ─────────────── */
+@keyframes ledBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.1; }
+}
+
+.drone-led-armed { animation: ledBlink 0.8s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   GEOFENCE PANEL (inferior derecho)
+   ═══════════════════════════════════════════════════════════════════ */
+.hud-geofence {
+  bottom: 96px;
+  right: 76px;
+  font-size: 11px;
+  min-width: 196px;
+  text-align: right;
+  padding: 8px 14px;
+}
+
+.geo-state         { color: rgba(0,255,136,0.65); letter-spacing: .1em; }
+.geo-state.geo-rec { color: #ff4444; animation: recBlink 1s ease-in-out infinite; text-shadow: 0 0 8px rgba(255,68,68,0.5); }
+.geo-state.geo-ok  { color: #00bfff; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SWARM PANEL
+   ═══════════════════════════════════════════════════════════════════ */
+.hud-swarm {
+  bottom: 186px;
+  right: 76px;
+  min-width: 196px;
+  font-size: 12px;
+  padding: 10px 14px;
+  color: var(--color-hud-blue);
+}
+
+.hud-swarm.hidden { display: none; }
+
+.swarm-status-flying    { color: #3bb8e0; }
+.swarm-status-rtb       { color: #f2a623; }
+.swarm-status-reloading { color: #e85d24; }
+.swarm-status-done      { color: rgba(255,255,255,0.22); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMMAND RAIL (barra vertical derecha con iconos)
+   ═══════════════════════════════════════════════════════════════════ */
+.command-rail {
+  position: absolute;
+  top: 50%;
+  right: 24px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 6px;
+  background: var(--panel-bg-primary);
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 11;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+}
+.command-rail::before {
+  content: 'CMD-01';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  background: #0a0c0c;
+  color: rgba(0, 255, 136, 0.65);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  border: 1px solid var(--panel-border-primary);
+  border-radius: 2px;
+}
+
+.cmd-btn {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 3px;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  position: relative;
+}
+.cmd-btn:hover {
+  background: rgba(0,255,136,0.08);
+  border-color: rgba(0,255,136,0.45);
+  color: #00ff88;
+}
+.cmd-btn.active {
+  background: rgba(59, 184, 224, 0.14);
+  border-color: rgba(59, 184, 224, 0.6);
+  color: #3bb8e0;
+}
+.cmd-btn svg { width: 18px; height: 18px; display: block; }
+
+.cmd-btn .cmd-tooltip {
+  position: absolute;
+  right: 50px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5px 10px;
+  background: rgba(10,12,12,0.95);
+  border: 1px solid rgba(0,255,136,0.35);
+  border-radius: 3px;
+  color: var(--color-hud-green);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.cmd-btn:hover .cmd-tooltip { opacity: 1; }
+.cmd-btn .cmd-tooltip::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 6px solid rgba(0,255,136,0.35);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+/* ─── Separador dentro del rail */
+.cmd-sep {
+  height: 1px;
+  margin: 2px 4px;
+  background: linear-gradient(to right, transparent, rgba(0,255,136,0.25), transparent);
+}

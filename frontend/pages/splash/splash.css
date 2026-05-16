@@ -1,0 +1,543 @@
+/* ============================================================
+   GALICIA WILDFIRE — Splash Screen (Operations Console)
+   CSS puro: sin canvas, sin librerías, sin imágenes externas.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg:           #0a0a0a;
+  --color-bg-2:         #0e0e10;
+  --color-accent-fire:  #e85d24;
+  --color-accent-fire2: #f2a623;
+  --color-orange-dim:   #c8640a;
+  --color-text-primary: #f0ece4;
+  --color-text-muted:   rgba(255, 255, 255, 0.5);
+  --color-hud-green:    #00ff88;
+  --font-sans:  'Inter', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Courier New', monospace;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* =====================
+   CONTENEDOR PRINCIPAL
+   ===================== */
+.splash {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 40%, rgba(232,93,36,0.04) 0%, transparent 70%),
+    var(--color-bg);
+}
+
+/* Grid HUD sutil de fondo */
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right,  rgba(255,255,255,0.020) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.020) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 1;
+  mask-image: radial-gradient(ellipse 80% 70% at center, black 0%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at center, black 0%, transparent 100%);
+}
+
+/* Viñeta radial */
+.bg-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 85% at center, transparent 40%, rgba(0,0,0,0.75) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Brackets operativos en esquinas */
+.corner-brackets {
+  position: absolute;
+  inset: 18px;
+  width: calc(100% - 36px);
+  height: calc(100% - 36px);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Micro-labels en esquinas */
+.tech-corner {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.38);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.tech-tl { top: 30px; left: 34px; }
+.tech-tr { top: 30px; right: 34px; }
+.tech-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-hud-green);
+  box-shadow: 0 0 8px rgba(0,255,136,0.6);
+  animation: techPulse 1.8s ease-in-out infinite;
+}
+@keyframes techPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.tech-label { color: rgba(255,255,255,0.32); }
+.tech-val   { color: var(--color-accent-fire2); font-weight: 700; }
+
+/* =====================
+   PARTÍCULAS DE CENIZA
+   ===================== */
+.ash-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  animation: ashDrift linear infinite;
+  z-index: 3;
+}
+
+/* Variante naranja — chispas incandescentes */
+.ash-particle.ember {
+  background: #ff6a1a;
+  box-shadow: 0 0 5px rgba(255,150,60,0.85), 0 0 12px rgba(255,80,0,0.35);
+}
+
+@keyframes ashDrift {
+  0% {
+    transform: translateY(110vh) translateX(0px);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-10vh) translateX(var(--drift-x, 15px));
+    opacity: 0;
+  }
+}
+
+/* =====================
+   CONTENIDO CENTRAL
+   ===================== */
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+  user-select: none;
+  position: relative;
+}
+
+/* Halo tenue detrás del logo */
+.splash-content::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px; height: 260px;
+  background: radial-gradient(ellipse at center, rgba(232,93,36,0.18) 0%, transparent 65%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* =====================
+   LOGO SVG (180×200px)
+   ===================== */
+.logo-svg {
+  width: 200px;
+  height: 220px;
+  display: block;
+  transition: opacity 0.35s ease;
+  filter: drop-shadow(0 6px 24px rgba(232,93,36,0.25));
+}
+
+/* Fuego apagado por el agua */
+.logo-svg.water-hit {
+  opacity: 0.28;
+}
+
+/* Animación de llamas — flicker asimétrico */
+@keyframes flicker {
+  0%   { opacity: 0.80; transform: scaleX(1.00) scaleY(1.00); }
+  30%  { opacity: 1.00; transform: scaleX(1.06) scaleY(1.03); }
+  55%  { opacity: 0.88; transform: scaleX(0.97) scaleY(1.05); }
+  80%  { opacity: 0.95; transform: scaleX(1.03) scaleY(0.98); }
+  100% { opacity: 0.82; transform: scaleX(1.00) scaleY(1.00); }
+}
+
+.flame { transform-origin: center bottom; }
+.flicker-a { animation: flicker 0.80s ease-in-out infinite alternate; }
+.flicker-b { animation: flicker 0.80s ease-in-out 0.18s infinite alternate; }
+.flicker-c { animation: flicker 0.80s ease-in-out 0.42s infinite alternate; }
+.flicker-d { animation: flicker 0.80s ease-in-out 0.61s infinite alternate; }
+
+/* =====================
+   TÍTULO — Type-on
+   ===================== */
+.title-block {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.title-main {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  font-size: 46px;
+  color: #ffffff;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  background: linear-gradient(180deg, #ffffff 0%, #d6d0c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 26px rgba(232,93,36,0.10);
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title-caret {
+  display: inline-block;
+  color: var(--color-accent-fire);
+  -webkit-text-fill-color: var(--color-accent-fire);
+  margin-left: 2px;
+  animation: caretBlink 0.55s step-end infinite;
+}
+@keyframes caretBlink {
+  50% { opacity: 0; }
+}
+
+.title-sub {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-orange-dim);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.title-sub::before { content: '◂ '; color: rgba(232,93,36,0.55); }
+.title-sub::after  { content: ' ▸'; color: rgba(232,93,36,0.55); }
+.title-sub.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* =====================
+   BARRA DE PROGRESO
+   ===================== */
+.progress-section {
+  margin-top: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.progress-section.visible { opacity: 1; }
+
+.progress-track {
+  width: 380px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.04),
+    0 0 16px rgba(232,93,36,0.10);
+}
+.progress-track::before,
+.progress-track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px; height: 10px;
+  background: rgba(232,93,36,0.55);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.progress-track::before { left: -9px; }
+.progress-track::after  { right: -9px; transform: translateY(-50%) rotate(180deg); }
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(to right, var(--color-accent-fire), var(--color-accent-fire2));
+  border-radius: 0;
+  transition: width 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  box-shadow: 0 0 14px rgba(242,166,35,0.55);
+}
+/* Línea de avance brillante al final del fill */
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 2px; height: 100%;
+  background: #ffe156;
+  box-shadow: 0 0 8px #ffe156, 0 0 16px #ff9a30;
+}
+
+.status-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.18em;
+  text-align: center;
+  transition: opacity 0.15s ease;
+  min-height: 1.4em;
+  text-transform: uppercase;
+}
+.status-text::before {
+  content: '▸ ';
+  color: var(--color-accent-fire);
+  margin-right: 4px;
+}
+
+/* =====================
+   DRON (ala fija, vista lateral)
+   Se posiciona y anima por JS
+   ===================== */
+.drone-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+  overflow: hidden;
+}
+
+.drone-svg-container {
+  position: absolute;
+  transform: translateX(-260px) rotate(-3deg);
+  will-change: transform;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.55));
+}
+
+.drone-svg-container.flying {
+  animation: dronePass 1.4s ease-in-out forwards;
+}
+
+@keyframes dronePass {
+  from { transform: translateX(-260px) rotate(-3deg); }
+  to   { transform: translateX(calc(100vw + 260px)) rotate(-3deg); }
+}
+
+/* =====================
+   GOTAS DE AGUA
+   ===================== */
+.water-drop {
+  position: absolute;
+  width: 5px;
+  height: 9px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: rgba(100, 200, 255, 0.85);
+  pointer-events: none;
+  opacity: 0;
+  animation: dropFall 0.9s ease-in forwards;
+  box-shadow: 0 0 4px rgba(120,210,255,0.65);
+  z-index: 21;
+}
+
+@keyframes dropFall {
+  0%   { transform: translate(0, 0);                                          opacity: 1;   }
+  20%  {                                                                       opacity: 1;   }
+  85%  { transform: translate(var(--drop-dx, 0px), var(--drop-fall, 120px)); opacity: 0.7; }
+  100% { transform: translate(var(--drop-dx, 0px), var(--drop-fall, 120px)); opacity: 0;   }
+}
+
+/* =====================
+   SPLASH DE IMPACTO
+   ===================== */
+.water-splash {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(80, 200, 255, 0.9);
+  background: rgba(100, 210, 255, 0.25);
+  pointer-events: none;
+  z-index: 22;
+  animation: splashExpand 0.55s ease-out forwards;
+}
+
+@keyframes splashExpand {
+  0%   { transform: scale(1);   opacity: 1;   }
+  40%  { transform: scale(2.5); opacity: 0.7; }
+  100% { transform: scale(5.5); opacity: 0;   }
+}
+
+/* =====================
+   VAPOR / STEAM
+   ===================== */
+.steam-puff {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(180, 220, 255, 0.65);
+  pointer-events: none;
+  z-index: 21;
+  animation: steamRise 0.75s ease-out forwards;
+}
+
+@keyframes steamRise {
+  0%   { transform: translate(0, 0)                           scale(1);   opacity: 0.75; }
+  60%  { transform: translate(var(--steam-dx, 0px), -22px)   scale(2);   opacity: 0.4;  }
+  100% { transform: translate(var(--steam-dx, 0px), -38px)   scale(2.8); opacity: 0;    }
+}
+
+/* =====================
+   DESTELLO AZUL DE IMPACTO
+   ===================== */
+.douse-flash {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(140, 210, 255, 0.55) 0%, rgba(80, 170, 255, 0) 68%);
+  pointer-events: none;
+  z-index: 20;
+  animation: flashFade 0.45s ease-out forwards;
+  transform-origin: center center;
+}
+
+@keyframes flashFade {
+  0%   { transform: scale(0.2); opacity: 1;   }
+  50%  { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0;   }
+}
+
+/* =====================
+   FOOTER TÉCNICO
+   ===================== */
+.splash-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 34px;
+  right: 34px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.4);
+  z-index: 5;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.splash-footer::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 22%;
+  height: 1px;
+  background: linear-gradient(to right, var(--color-accent-fire), transparent);
+}
+
+.footer-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.footer-label {
+  color: rgba(255,255,255,0.28);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+.footer-val {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+.footer-val.ok   { color: var(--color-hud-green); }
+.footer-val.warn { color: var(--color-accent-fire2); }
+
+.footer-spacer { flex: 1; }
+
+/* =====================
+   WIPE DE SALIDA
+   ===================== */
+.splash-wipe {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+}
+
+.wipe-bar {
+  position: absolute;
+  left: -20%;
+  width: 140%;
+  height: 50%;
+  background: linear-gradient(90deg, #c24510 0%, #e85d24 50%, #f2a623 100%);
+  box-shadow: 0 0 40px rgba(232,93,36,0.6);
+}
+.wipe-bar-top {
+  top: 0;
+  transform: translateY(-100%) skewY(-2deg);
+  animation: wipeDown 0.55s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+.wipe-bar-bot {
+  bottom: 0;
+  transform: translateY(100%) skewY(-2deg);
+  animation: wipeUp 0.55s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+@keyframes wipeDown {
+  to { transform: translateY(0) skewY(0); }
+}
+@keyframes wipeUp {
+  to { transform: translateY(0) skewY(0); }
+}
+
+/* =====================
+   FADE OUT LEGACY
+   ===================== */
+.splash.fadeout {
+  animation: splashFadeOut 0.6s ease forwards;
+}
+
+@keyframes splashFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}

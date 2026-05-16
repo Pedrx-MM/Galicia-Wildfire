@@ -1,0 +1,88 @@
+services:
+
+  # ── Base de datos ─────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: gw-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: gw_admin
+      MONGO_INITDB_ROOT_PASSWORD: gw_pass
+      MONGO_INITDB_DATABASE: galicia_wildfire
+    ports:
+      - "27018:27017"
+    volumes:
+      - gw_mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: gw-mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: gw_admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: gw_pass
+      ME_CONFIG_MONGODB_URL: mongodb://gw_admin:gw_pass@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+
+  # ── Backend FastAPI ───────────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: gw-backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGODB_URI: mongodb://gw_admin:gw_pass@mongodb:27017/galicia_wildfire?authSource=admin
+      MAVLINK_HOST: "0.0.0.0"
+      MAVLINK_PORT: "14550"
+      SITL_MODE: external
+      FRONTEND_URL: "http://localhost:3000"
+    ports:
+      - "8000:8000"
+
+  # ── Simulador de física del dron ──────────────────────────────────────────────
+  simulador-gw:
+    build: ./simulador-gw
+    container_name: gw-simulador
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGO_URI: mongodb://gw_admin:gw_pass@mongodb:27017/
+      DB_NAME: galicia_wildfire
+      TICK_SEGUNDOS: "1"
+      SIM_DRONE_ID: gw-sim-01
+
+  # ── Bridge MAVLink: sim_drones → UDP → backend ────────────────────────────────
+  mavlink-bridge:
+    build: ./mavlink-bridge
+    container_name: gw-mavlink-bridge
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      MONGO_URI: mongodb://gw_admin:gw_pass@mongodb:27017/
+      DB_NAME: galicia_wildfire
+      SERVER_HOST: backend
+      MAVLINK_PORT: "14550"
+      TICK_SEGUNDOS: "1"
+      SIM_DRONE_ID: gw-sim-01
+
+volumes:
+  gw_mongodata:

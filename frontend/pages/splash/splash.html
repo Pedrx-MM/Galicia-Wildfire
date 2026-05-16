@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galicia Wildfire</title>
+  <link rel="stylesheet" href="splash.css">
+</head>
+<body>
+
+<div class="splash" id="splash">
+
+  <!-- Rejilla sutil de fondo (grid HUD) -->
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <!-- Viñeta radial oscura en los bordes -->
+  <div class="bg-vignette" aria-hidden="true"></div>
+
+  <!-- Corner brackets operativos -->
+  <svg class="corner-brackets" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M1,6 L1,1 L6,1"       stroke="rgba(232,93,36,0.45)" stroke-width="0.25" fill="none"/>
+    <path d="M94,1 L99,1 L99,6"    stroke="rgba(232,93,36,0.45)" stroke-width="0.25" fill="none"/>
+    <path d="M1,94 L1,99 L6,99"    stroke="rgba(232,93,36,0.45)" stroke-width="0.25" fill="none"/>
+    <path d="M94,99 L99,99 L99,94" stroke="rgba(232,93,36,0.45)" stroke-width="0.25" fill="none"/>
+  </svg>
+
+  <!-- Header técnico (esquinas superior izq/dcha) -->
+  <div class="tech-corner tech-tl">
+    <span class="tech-dot"></span> GW.OS · v0.4.1
+  </div>
+  <div class="tech-corner tech-tr">
+    <span class="tech-label">SESSION</span> <span class="tech-val" id="techSession">WF-2026-0419</span>
+  </div>
+
+  <!-- Partículas de ceniza — generadas por splash.js -->
+  <div id="ashLayer" aria-hidden="true"></div>
+
+  <!-- Contenido central -->
+  <div class="splash-content">
+
+    <!-- ==========================================
+         LOGO SVG: pinos gallegos en llamas
+         180×200 px, todo inline, sin imágenes.
+         ========================================== -->
+    <svg class="logo-svg" viewBox="0 0 180 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo Galicia Wildfire">
+      <defs>
+        <!-- Gradiente principal: naranja→rojo desde base a punta -->
+        <linearGradient id="gFlame1" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stop-color="#c0392b"/>
+          <stop offset="40%"  stop-color="#e85d24"/>
+          <stop offset="80%"  stop-color="#f2a623"/>
+          <stop offset="100%" stop-color="#ffe156"/>
+        </linearGradient>
+        <!-- Gradiente interior: más brillante -->
+        <linearGradient id="gFlame2" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stop-color="#e85d24"/>
+          <stop offset="55%"  stop-color="#f2a623"/>
+          <stop offset="100%" stop-color="#fff0a0"/>
+        </linearGradient>
+        <!-- Gradiente punta fina -->
+        <linearGradient id="gFlame3" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%"   stop-color="#f2a623" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#ffe156" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+
+      <!-- ──────────────────────────────
+           ÁRBOL 1 (izquierda, pequeño)
+           Tronco: x=37-43, base y=190
+           ────────────────────────────── -->
+      <!-- Tronco -->
+      <rect x="37" y="158" width="6" height="32" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa baja -->
+      <polygon points="24,158 40,130 56,158" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa alta -->
+      <polygon points="28,136 40,112 52,136"  fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+
+      <!-- Llamas árbol 1 (base ~112, punta ~62) -->
+      <!-- Llama exterior izquierda -->
+      <path class="flame flicker-c"
+        d="M31,112 C27,100 26,86 32,72 C35,80 34,95 38,112 Z"
+        fill="url(#gFlame1)" opacity="0.85"/>
+      <!-- Llama principal -->
+      <path class="flame flicker-a"
+        d="M33,112 C30,95 31,78 40,62 C49,78 50,95 47,112 Z"
+        fill="url(#gFlame1)"/>
+      <!-- Llama interior brillante -->
+      <path class="flame flicker-b"
+        d="M36,112 C34,98 36,83 40,72 C44,83 46,98 44,112 Z"
+        fill="url(#gFlame2)"/>
+      <!-- Lengua derecha -->
+      <path class="flame flicker-d"
+        d="M42,112 C46,98 48,84 44,70 C47,80 50,96 49,112 Z"
+        fill="url(#gFlame1)" opacity="0.80"/>
+      <!-- Punta fina -->
+      <path class="flame flicker-b"
+        d="M38,80 C39,70 41,62 40,54 C41,62 43,70 42,80 Z"
+        fill="url(#gFlame3)"/>
+
+      <!-- ──────────────────────────────
+           ÁRBOL 2 (centro, más alto)
+           Tronco: x=86-94, base y=190
+           ────────────────────────────── -->
+      <!-- Tronco -->
+      <rect x="86" y="150" width="8" height="40" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa baja -->
+      <polygon points="70,150 90,115 110,150"   fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa media -->
+      <polygon points="74,122 90,92  106,122"   fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa alta -->
+      <polygon points="78,98  90,72  102,98"    fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+
+      <!-- Llamas árbol 2 (base ~72, punta ~18) — las más altas -->
+      <!-- Llama exterior izquierda -->
+      <path class="flame flicker-d"
+        d="M78,72 C72,58 71,40 78,26 C82,38 81,56 85,72 Z"
+        fill="url(#gFlame1)" opacity="0.80"/>
+      <!-- Llama principal grande -->
+      <path class="flame flicker-a"
+        d="M80,72 C75,52 76,32 90,18 C104,32 105,52 100,72 Z"
+        fill="url(#gFlame1)"/>
+      <!-- Llama interior brillante -->
+      <path class="flame flicker-b"
+        d="M84,72 C81,55 83,37 90,28 C97,37 99,55 96,72 Z"
+        fill="url(#gFlame2)"/>
+      <!-- Lengua derecha -->
+      <path class="flame flicker-c"
+        d="M95,72 C100,56 101,38 96,24 C99,36 103,56 102,72 Z"
+        fill="url(#gFlame1)" opacity="0.78"/>
+      <!-- Lengua central fina -->
+      <path class="flame flicker-a"
+        d="M88,45 C89,32 91,22 90,12 C91,22 93,32 92,45 Z"
+        fill="url(#gFlame3)"/>
+
+      <!-- ──────────────────────────────
+           ÁRBOL 3 (derecha, mediano)
+           Tronco: x=136-142, base y=190
+           ────────────────────────────── -->
+      <!-- Tronco -->
+      <rect x="136" y="155" width="6" height="35" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa baja -->
+      <polygon points="124,155 139,126 154,155" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa media -->
+      <polygon points="127,132 139,106 151,132" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+      <!-- Capa copa alta -->
+      <polygon points="130,110 139,88  148,110" fill="#2a2a2a" stroke="#e8e0d0" stroke-width="0.6"/>
+
+      <!-- Llamas árbol 3 (base ~88, punta ~42) -->
+      <!-- Llama exterior izquierda -->
+      <path class="flame flicker-b"
+        d="M131,88 C127,76 126,61 132,48 C135,58 134,73 137,88 Z"
+        fill="url(#gFlame1)" opacity="0.82"/>
+      <!-- Llama principal -->
+      <path class="flame flicker-c"
+        d="M133,88 C130,72 131,55 139,42 C147,55 148,72 145,88 Z"
+        fill="url(#gFlame1)"/>
+      <!-- Llama interior brillante -->
+      <path class="flame flicker-a"
+        d="M136,88 C134,74 136,59 139,50 C142,59 144,74 142,88 Z"
+        fill="url(#gFlame2)"/>
+      <!-- Lengua derecha -->
+      <path class="flame flicker-d"
+        d="M143,88 C147,74 147,59 143,46 C146,57 149,72 148,88 Z"
+        fill="url(#gFlame1)" opacity="0.78"/>
+      <!-- Punta fina -->
+      <path class="flame flicker-c"
+        d="M137,62 C138,52 140,44 139,36 C140,44 142,52 141,62 Z"
+        fill="url(#gFlame3)"/>
+    </svg>
+
+    <!-- Nombre de la aplicación -->
+    <div class="title-block">
+      <h1 class="title-main">GALICIA WILDFIRE</h1>
+      <p class="title-sub">Sistema de extinción autónoma · Drones UAV</p>
+    </div>
+
+    <!-- Barra de progreso + texto de estado -->
+    <div class="progress-section" id="progressSection" aria-live="polite">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <p class="status-text" id="statusText"></p>
+    </div>
+  </div>
+
+  <!-- Capa del dron — contenida en el splash para el overflow:hidden -->
+  <div class="drone-wrapper" id="droneWrapper" aria-hidden="true">
+    <!-- El dron SVG se inyecta por JS con posición calculada -->
+  </div>
+
+  <!-- Footer técnico fijo -->
+  <footer class="splash-footer" aria-hidden="true">
+    <div class="footer-block">
+      <span class="footer-label">BUILD</span>
+      <span class="footer-val">0.4.1-rc</span>
+    </div>
+    <div class="footer-block">
+      <span class="footer-label">MAVLINK</span>
+      <span class="footer-val ok">READY</span>
+    </div>
+    <div class="footer-block">
+      <span class="footer-label">TERRAIN</span>
+      <span class="footer-val ok">PNOA · SRTM</span>
+    </div>
+    <div class="footer-spacer"></div>
+    <div class="footer-block">
+      <span class="footer-label">CLASSIFICATION</span>
+      <span class="footer-val warn">OPERATIONAL · TRAINING</span>
+    </div>
+    <div class="footer-block">
+      <span class="footer-label">© 2026</span>
+      <span class="footer-val">GALICIA WILDFIRE OPS</span>
+    </div>
+  </footer>
+
+</div><!-- /.splash -->
+
+<script src="splash.js"></script>
+</body>
+</html>

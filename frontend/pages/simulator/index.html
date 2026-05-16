@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galicia Wildfire — Simulador</title>
+
+  <script src="../../config.js"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <link rel="stylesheet" href="../../components/hud/hud.css">
+  <link rel="stylesheet" href="simulator.css">
+</head>
+<body>
+
+<!-- ═══ MAPA ════════════════════════════════════════════════════════════════ -->
+<div id="map"></div>
+
+<!-- ═══ OVERLAY FPV ══════════════════════════════════════════════════════════ -->
+<div class="fpv-overlay hidden" id="fpvOverlay">
+  <!-- Tinte NV sutil -->
+  <div class="fpv-tint"></div>
+
+  <!-- Viñeta oscura en bordes -->
+  <div class="fpv-vignette"></div>
+
+  <!-- Brackets de esquina (estilo cámara militar) -->
+  <svg class="fpv-corners" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4,14 L4,4 L14,4"   fill="none" stroke="#00ff88" stroke-width="0.8" opacity="0.65"/>
+    <path d="M86,4 L96,4 L96,14" fill="none" stroke="#00ff88" stroke-width="0.8" opacity="0.65"/>
+    <path d="M4,86 L4,96 L14,96" fill="none" stroke="#00ff88" stroke-width="0.8" opacity="0.65"/>
+    <path d="M96,86 L96,96 L86,96" fill="none" stroke="#00ff88" stroke-width="0.8" opacity="0.65"/>
+    <!-- Marcas de rango externas -->
+    <line x1="50" y1="8"  x2="50" y2="13"  stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+    <line x1="50" y1="87" x2="50" y2="92"  stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+    <line x1="8"  y1="50" x2="13"  y2="50" stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+    <line x1="87" y1="50" x2="92" y2="50"  stroke="#00ff88" stroke-width="0.5" opacity="0.4"/>
+  </svg>
+
+  <!-- Crosshair central -->
+  <svg class="fpv-crosshair" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <!-- Línea horizontal (con hueco central) -->
+    <line x1="32" y1="50" x2="44" y2="50" stroke="#00ff88" stroke-width="0.9" opacity="0.75"/>
+    <line x1="56" y1="50" x2="68" y2="50" stroke="#00ff88" stroke-width="0.9" opacity="0.75"/>
+    <!-- Línea vertical -->
+    <line x1="50" y1="32" x2="50" y2="44" stroke="#00ff88" stroke-width="0.9" opacity="0.75"/>
+    <line x1="50" y1="56" x2="50" y2="68" stroke="#00ff88" stroke-width="0.9" opacity="0.75"/>
+    <!-- Punto central -->
+    <circle cx="50" cy="50" r="1.2" fill="#00ff88" opacity="0.9"/>
+    <!-- Círculo interior -->
+    <circle cx="50" cy="50" r="6" fill="none" stroke="#00ff88" stroke-width="0.7" opacity="0.55"/>
+    <!-- Círculo exterior (rango) -->
+    <circle cx="50" cy="50" r="14" fill="none" stroke="#00ff88" stroke-width="0.4" opacity="0.3"/>
+    <!-- Marcas de rango en el círculo exterior -->
+    <line x1="50" y1="35"  x2="50" y2="38"  stroke="#00ff88" stroke-width="0.5" opacity="0.45"/>
+    <line x1="50" y1="62"  x2="50" y2="65"  stroke="#00ff88" stroke-width="0.5" opacity="0.45"/>
+    <line x1="35" y1="50"  x2="38" y2="50"  stroke="#00ff88" stroke-width="0.5" opacity="0.45"/>
+    <line x1="62" y1="50"  x2="65" y2="50"  stroke="#00ff88" stroke-width="0.5" opacity="0.45"/>
+  </svg>
+
+  <!-- Info labels militares -->
+  <div class="fpv-label fpv-tl">EO/IR &nbsp;<span class="fpv-rec">●</span> LIVE</div>
+  <div class="fpv-label fpv-tr" id="fpvCoords">—</div>
+  <div class="fpv-label fpv-bl" id="fpvAlt">ALT — m AGL</div>
+  <div class="fpv-label fpv-br">GW-01</div>
+
+  <!-- Scan lines sutiles -->
+  <div class="fpv-scanlines"></div>
+</div>
+
+<!-- ═══ BANNERS ══════════════════════════════════════════════════════════════ -->
+<div class="ws-banner hidden" id="wsBanner">⚠ Telemetría desconectada — reconectando...</div>
+
+<div class="ws-banner hidden" id="noMissionBanner"
+     style="top:50px;border-color:rgba(232,93,36,.5);color:#e85d24;">
+  Sin datos de misión —
+  <a href="../planning/index.html" style="color:inherit">volver a planificación</a>
+</div>
+
+<div class="mock-badge hidden" id="mockBadge">◉ MOCK TELEMETRY</div>
+
+<!-- Gamepad banner — con nombre del mando y botón de scan -->
+<div class="gamepad-banner" id="gamepadBanner">
+  <span>⚠ Gamepad no detectado — pulsa un botón o </span>
+  <button class="gamepad-scan-btn" id="gamepadScan">ESCANEAR</button>
+  <div id="gamepadName" style="font-size:10px;opacity:0.6;margin-top:3px;"></div>
+</div>
+
+<!-- ═══ COMPASS TAPE — cinta de rumbo superior central ═══════════════════════ -->
+<div class="compass-tape" id="compassTape" aria-hidden="true">
+  <div class="compass-heading-label" id="compassHeadingLabel">000°</div>
+  <div class="compass-center-line"></div>
+  <div class="compass-tape-track">
+    <div id="compassTapeStrip"></div>
+  </div>
+  <div class="compass-wind-pip" id="compassWindPip" style="left:50%"></div>
+  <div class="compass-index"></div>
+</div>
+
+<!-- ═══ HUD SUPERIOR IZQUIERDO — telemetría primaria ══════════════════════════ -->
+<div class="hud-panel hud-topleft primary" data-panel-id="TEL-01 · NAV">
+  <div class="hud-row">
+    <span class="hud-label">IAS</span>
+    <span class="hud-value" id="hudIAS">—</span>
+    <span class="hud-unit">km/h</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">GS</span>
+    <span class="hud-value" id="hudGSPD">—</span>
+    <span class="hud-unit">km/h</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">ALT</span>
+    <span class="hud-value" id="hudALT">—</span>
+    <span class="hud-unit">m AGL</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">HDG</span>
+    <span class="hud-value" id="hudHDG">—</span>
+    <span class="hud-unit">°</span>
+  </div>
+  <div class="hud-row">
+    <span class="hud-label">V/S</span>
+    <span class="hud-value" id="hudVSPD" style="font-size:15px">—</span>
+    <span class="hud-unit">m/s</span>
+  </div>
+</div>
+
+<!-- ═══ HUD SUPERIOR DERECHO: horizonte artificial ════════════════════════════ -->
+<div class="hud-panel hud-topright primary" data-panel-id="ADI-01">
+  <div class="attitude-ring">
+    <div class="attitude-inner" id="attitudeInner">
+      <div class="attitude-horizon-line"></div>
+    </div>
+    <div class="attitude-cross"></div>
+  </div>
+  <div class="attitude-labels">
+    <span>R <span id="rollVal">0.0°</span></span>
+    <span>P <span id="pitchVal">0.0°</span></span>
+  </div>
+</div>
+
+<!-- ═══ V-TAPE VELOCIDAD (izquierda del horizonte) ═══════════════════════════ -->
+<div class="vtape vtape-speed" aria-hidden="true">
+  <div class="vtape-title">IAS</div>
+  <div class="vtape-track">
+    <div class="vtape-strip" id="vtapeSpeedStrip"></div>
+  </div>
+  <div class="vtape-value" id="vtapeSpeedValue">—</div>
+</div>
+
+<!-- ═══ V-TAPE ALTITUD (a la derecha, justo antes del horizonte) ═════════════ -->
+<div class="vtape vtape-alt" aria-hidden="true">
+  <div class="vtape-title">ALT</div>
+  <div class="vtape-track">
+    <div class="vtape-strip" id="vtapeAltStrip"></div>
+  </div>
+  <div class="vtape-value" id="vtapeAltValue">—</div>
+</div>
+
+<!-- ═══ THROTTLE BAR (vertical izquierda) ════════════════════════════════════ -->
+<div class="throttle-bar" aria-hidden="true">
+  <div class="throttle-label">THR</div>
+  <div class="throttle-fill" id="throttleFill"></div>
+  <div class="throttle-ticks">
+    <span>100</span><span>75</span><span>50</span><span>25</span><span>0</span>
+  </div>
+  <div class="throttle-value" id="throttleValue">0%</div>
+</div>
+
+<!-- ═══ MISSION STATUS BAR (inferior central) ════════════════════════════════ -->
+<div class="hud-panel hud-bottom primary interactive">
+  <div class="mode-badge mode-manual" id="modeBadge">
+    <span class="mode-dot"></span>
+    <span class="mode-text">MANUAL</span>
+  </div>
+  <div class="arm-badge disarmed" id="armBadge">○ DESARMADO</div>
+  <div class="hud-sep"></div>
+  <button class="hud-btn btn-mission" id="btnMission" title="Iniciar misión planificada (T)">INICIAR</button>
+  <div class="hud-sep"></div>
+  <button class="hud-btn" id="btnFBWA">FBWA</button>
+  <button class="hud-btn" id="btnCruise">CRUISE</button>
+  <button class="hud-btn" id="btnRTL" style="color:#f2a623;border-color:rgba(242,166,35,.4)">RTL</button>
+  <div class="hud-sep"></div>
+  <button class="hud-btn btn-arm" id="btnArm">ARM</button>
+</div>
+
+<!-- ═══ WP INFO ═══════════════════════════════════════════════════════════════ -->
+<div class="hud-panel hud-wpinfo tertiary" data-panel-id="MSN · WP">
+  <span class="hud-label" style="opacity:.55;font-size:9px">WP</span>
+  &nbsp;<span id="wpNum">—</span>/<span id="wpTotal">—</span>
+  &nbsp;&middot;&nbsp;
+  <span class="hud-label" style="opacity:.55;font-size:9px">DIST</span>
+  &nbsp;<span id="wpDist">—</span>
+</div>
+
+<!-- ═══ GEOFENCE STATUS (inferior derecho) ═══════════════════════════════════ -->
+<div class="hud-panel hud-geofence" id="hudGeofence" data-panel-id="GEO-01">
+  <div class="geo-state" id="geoState">GEOFENCE: INACTIVA</div>
+</div>
+
+<!-- ═══ ENJAMBRE (aparece al lanzar) ═════════════════════════════════════════ -->
+<div class="hud-panel hud-swarm hidden" id="hudSwarm" data-panel-id="SWRM · ACTIVO">
+  <div id="swarmDroneList" style="font-size:11px;line-height:1.7"></div>
+  <div style="margin-top:5px;font-size:10px;color:rgba(59,184,224,0.6)" id="swarmEta"></div>
+</div>
+
+<!-- ═══ BADGE CÁMARA ══════════════════════════════════════════════════════════ -->
+<div class="cam-badge" id="camBadge" title="R3 / V para cambiar vista">◎ FOLLOW</div>
+
+<!-- ═══ COMMAND RAIL (barra vertical derecha con iconos) ═════════════════════ -->
+<div class="command-rail" aria-label="Command Rail">
+  <button class="cmd-btn" id="btnSettings" aria-label="Ajustes / Controles">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    <span class="cmd-tooltip">AJUSTES</span>
+  </button>
+
+  <div class="cmd-sep"></div>
+
+  <button class="cmd-btn active" id="btnPNOA" aria-label="PNOA Ortofoto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+      <line x1="8" y1="2" x2="8" y2="18"/>
+      <line x1="16" y1="6" x2="16" y2="22"/>
+    </svg>
+    <span class="cmd-tooltip">PNOA</span>
+  </button>
+
+  <button class="cmd-btn" id="btnFollow" aria-label="Cámara Follow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3"/>
+      <path d="M12 19v3"/>
+      <path d="M2 12h3"/>
+      <path d="M19 12h3"/>
+    </svg>
+    <span class="cmd-tooltip">FOLLOW</span>
+  </button>
+
+  <div class="cmd-sep"></div>
+
+  <button class="cmd-btn" id="btnBack" aria-label="Volver a Planificación">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+    <span class="cmd-tooltip">PLAN</span>
+  </button>
+</div>
+
+<!-- ═══ MODAL DE AJUSTES / CONTROLES ════════════════════════════════════════ -->
+<div class="settings-overlay hidden" id="settingsOverlay">
+  <div class="settings-card">
+    <div class="settings-header">
+      <span>◈ CONTROLES · GW-01</span>
+      <button class="settings-close" id="settingsClose">✕</button>
+    </div>
+
+    <!-- ── Diagrama del mando Xbox ──────────────────────── -->
+    <div class="xbox-wrap">
+      <svg class="xbox-svg" viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg" aria-label="Diagrama del mando Xbox">
+        <defs>
+          <!-- Gradiente del cuerpo del mando -->
+          <linearGradient id="xb-body" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stop-color="#2a2a2a"/>
+            <stop offset="40%"  stop-color="#1d1d1d"/>
+            <stop offset="100%" stop-color="#0d0d0d"/>
+          </linearGradient>
+          <linearGradient id="xb-grip" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stop-color="#242424"/>
+            <stop offset="100%" stop-color="#0a0a0a"/>
+          </linearGradient>
+          <radialGradient id="xb-stick" cx="35%" cy="30%" r="70%">
+            <stop offset="0%"   stop-color="#4a4a4a"/>
+            <stop offset="70%"  stop-color="#1a1a1a"/>
+            <stop offset="100%" stop-color="#050505"/>
+          </radialGradient>
+          <radialGradient id="xb-yellow" cx="35%" cy="30%" r="75%">
+            <stop offset="0%"   stop-color="#ffe156"/>
+            <stop offset="100%" stop-color="#c59a12"/>
+          </radialGradient>
+          <radialGradient id="xb-red" cx="35%" cy="30%" r="75%">
+            <stop offset="0%"   stop-color="#ff7a6f"/>
+            <stop offset="100%" stop-color="#b02418"/>
+          </radialGradient>
+          <radialGradient id="xb-green" cx="35%" cy="30%" r="75%">
+            <stop offset="0%"   stop-color="#5dfba1"/>
+            <stop offset="100%" stop-color="#117f3d"/>
+          </radialGradient>
+          <radialGradient id="xb-blue" cx="35%" cy="30%" r="75%">
+            <stop offset="0%"   stop-color="#7ac8ff"/>
+            <stop offset="100%" stop-color="#124a8a"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Cuerpo principal (grips + centro) -->
+        <path d="M 110 80
+                 Q 70 70 50 110 Q 30 160 60 240 Q 90 300 140 260
+                 L 380 260
+                 Q 430 300 460 240 Q 490 160 470 110 Q 450 70 410 80
+                 Q 310 60 260 60 Q 210 60 110 80 Z"
+              fill="url(#xb-body)" stroke="#000" stroke-width="1.5"/>
+
+        <!-- Grips -->
+        <ellipse cx="90"  cy="200" rx="48" ry="58" fill="url(#xb-grip)" opacity="0.55"/>
+        <ellipse cx="430" cy="200" rx="48" ry="58" fill="url(#xb-grip)" opacity="0.55"/>
+
+        <!-- Botón Xbox central (logo home) -->
+        <circle cx="260" cy="110" r="14" fill="#0a0a0a" stroke="#3a3a3a" stroke-width="1"/>
+        <circle cx="260" cy="110" r="9" fill="none" stroke="#c0c0c0" stroke-width="1.2"/>
+        <path d="M 256 105 L 264 115 M 264 105 L 256 115" stroke="#c0c0c0" stroke-width="1.4" stroke-linecap="round"/>
+
+        <!-- ── Stick izquierdo (parte alta) ── -->
+        <g id="xb-ls">
+          <circle cx="155" cy="130" r="32" fill="#0a0a0a" stroke="#2a2a2a" stroke-width="1.5"/>
+          <circle cx="155" cy="130" r="24" fill="url(#xb-stick)"/>
+          <circle cx="149" cy="124" r="5" fill="rgba(255,255,255,0.18)"/>
+        </g>
+
+        <!-- ── D-Pad (debajo-centro-izq) ── -->
+        <g id="xb-dpad" transform="translate(210 195)">
+          <rect x="-22" y="-6" width="44" height="12" fill="#1a1a1a" stroke="#000" stroke-width="0.8" rx="2"/>
+          <rect x="-6" y="-22" width="12" height="44" fill="#1a1a1a" stroke="#000" stroke-width="0.8" rx="2"/>
+          <rect x="-5" y="-21" width="10" height="18" fill="#2a2a2a"/>
+          <rect x="-5" y="3"   width="10" height="18" fill="#2a2a2a"/>
+          <rect x="-21" y="-5" width="18" height="10" fill="#2a2a2a"/>
+          <rect x="3"   y="-5" width="18" height="10" fill="#2a2a2a"/>
+        </g>
+
+        <!-- ── Stick derecho ── -->
+        <g id="xb-rs">
+          <circle cx="325" cy="195" r="32" fill="#0a0a0a" stroke="#2a2a2a" stroke-width="1.5"/>
+          <circle cx="325" cy="195" r="24" fill="url(#xb-stick)"/>
+          <circle cx="319" cy="189" r="5" fill="rgba(255,255,255,0.18)"/>
+        </g>
+
+        <!-- ── Botones ABXY ── -->
+        <!-- Y (arriba, amarillo) -->
+        <circle cx="395" cy="105" r="13" fill="url(#xb-yellow)" stroke="#000" stroke-width="0.8"/>
+        <text x="395" y="110" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#1a1a1a">Y</text>
+        <!-- B (derecha, rojo) -->
+        <circle cx="420" cy="130" r="13" fill="url(#xb-red)" stroke="#000" stroke-width="0.8"/>
+        <text x="420" y="135" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#fff">B</text>
+        <!-- A (abajo, verde) -->
+        <circle cx="395" cy="155" r="13" fill="url(#xb-green)" stroke="#000" stroke-width="0.8"/>
+        <text x="395" y="160" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#fff">A</text>
+        <!-- X (izquierda, azul) -->
+        <circle cx="370" cy="130" r="13" fill="url(#xb-blue)" stroke="#000" stroke-width="0.8"/>
+        <text x="370" y="135" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#fff">X</text>
+
+        <!-- ── Botones Start / Back (centrales) ── -->
+        <circle cx="225" cy="115" r="5" fill="#333" stroke="#555" stroke-width="0.5"/>
+        <circle cx="295" cy="115" r="5" fill="#333" stroke="#555" stroke-width="0.5"/>
+
+        <!-- ── Gatillos LT/RT (arriba, vista en perspectiva) ── -->
+        <path d="M 130 52 Q 125 35 150 35 L 180 35 Q 195 35 195 52 Q 195 62 180 62 L 148 62 Q 130 62 130 52 Z"
+              fill="#1a1a1a" stroke="#000" stroke-width="0.8"/>
+        <text x="162" y="52" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="10" fill="#c0c0c0">LT</text>
+        <path d="M 325 52 Q 325 35 340 35 L 370 35 Q 395 35 390 52 Q 390 62 372 62 L 340 62 Q 325 62 325 52 Z"
+              fill="#1a1a1a" stroke="#000" stroke-width="0.8"/>
+        <text x="358" y="52" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="10" fill="#c0c0c0">RT</text>
+
+        <!-- ── Bumpers LB/RB (frente, arriba) ── -->
+        <rect x="135" y="66" width="60" height="10" rx="4" fill="#262626" stroke="#000" stroke-width="0.6"/>
+        <text x="165" y="74" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="8.5" fill="#c0c0c0">LB</text>
+        <rect x="325" y="66" width="60" height="10" rx="4" fill="#262626" stroke="#000" stroke-width="0.6"/>
+        <text x="355" y="74" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="8.5" fill="#c0c0c0">RB</text>
+
+        <!-- ═══ CALLOUTS ═══ -->
+        <g class="xb-callouts" font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="700">
+          <!-- LT -->
+          <line x1="162" y1="52" x2="40" y2="20" stroke="rgba(0,255,136,0.45)" stroke-width="0.8"/>
+          <circle cx="162" cy="52" r="2.2" fill="#00ff88"/>
+          <text x="40" y="17" text-anchor="start" fill="#00ff88">LT · THROTTLE −</text>
+          <!-- RT -->
+          <line x1="358" y1="52" x2="480" y2="20" stroke="rgba(0,255,136,0.45)" stroke-width="0.8"/>
+          <circle cx="358" cy="52" r="2.2" fill="#00ff88"/>
+          <text x="480" y="17" text-anchor="end" fill="#00ff88">RT · THROTTLE +</text>
+          <!-- LB -->
+          <line x1="165" y1="71" x2="30" y2="60" stroke="rgba(232,160,32,0.55)" stroke-width="0.8"/>
+          <circle cx="165" cy="71" r="2.2" fill="#e8a020"/>
+          <text x="30" y="57" text-anchor="start" fill="#e8a020">LB · CERRAR GEOFENCE</text>
+          <!-- RB -->
+          <line x1="355" y1="71" x2="490" y2="60" stroke="rgba(232,160,32,0.55)" stroke-width="0.8"/>
+          <circle cx="355" cy="71" r="2.2" fill="#e8a020"/>
+          <text x="490" y="57" text-anchor="end" fill="#e8a020">RB · VÉRTICE GEOFENCE</text>
+          <!-- LS -->
+          <line x1="155" y1="130" x2="20" y2="140" stroke="rgba(59,184,224,0.55)" stroke-width="0.8"/>
+          <circle cx="155" cy="130" r="2.2" fill="#3bb8e0"/>
+          <text x="20" y="137" text-anchor="start" fill="#3bb8e0">STICK IZQ · ALABEO/CABECEO</text>
+          <!-- RS -->
+          <line x1="325" y1="195" x2="500" y2="215" stroke="rgba(59,184,224,0.55)" stroke-width="0.8"/>
+          <circle cx="325" cy="195" r="2.2" fill="#3bb8e0"/>
+          <text x="500" y="212" text-anchor="end" fill="#3bb8e0">STICK DCHO · GUIÑADA</text>
+          <text x="500" y="225" text-anchor="end" fill="#3bb8e0" opacity="0.65">R3 · CICLAR CÁMARA</text>
+          <!-- D-Pad -->
+          <line x1="210" y1="195" x2="30" y2="245" stroke="rgba(255,255,255,0.45)" stroke-width="0.8"/>
+          <circle cx="210" cy="195" r="2.2" fill="#c0c0c0"/>
+          <text x="30" y="242" text-anchor="start" fill="#c0c0c0">D-PAD · MOVER CÁMARA ORBITAL</text>
+          <!-- Y (ARM) -->
+          <line x1="395" y1="95" x2="495" y2="95" stroke="rgba(242,230,86,0.7)" stroke-width="0.8"/>
+          <circle cx="395" cy="95" r="2.2" fill="#ffe156"/>
+          <text x="495" y="92" text-anchor="end" fill="#ffe156">Y · ARMAR</text>
+          <!-- B (DISARM) -->
+          <line x1="433" y1="130" x2="515" y2="135" stroke="rgba(255,122,111,0.7)" stroke-width="0.8"/>
+          <circle cx="433" cy="130" r="2.2" fill="#ff7a6f"/>
+          <text x="515" y="132" text-anchor="end" fill="#ff7a6f">B · DESARMAR</text>
+          <!-- A (FBWA) -->
+          <line x1="395" y1="168" x2="495" y2="170" stroke="rgba(93,251,161,0.7)" stroke-width="0.8"/>
+          <circle cx="395" cy="168" r="2.2" fill="#5dfba1"/>
+          <text x="495" y="167" text-anchor="end" fill="#5dfba1">A · MODO FBWA</text>
+          <!-- X (CRUISE) -->
+          <line x1="357" y1="130" x2="305" y2="290" stroke="rgba(122,200,255,0.7)" stroke-width="0.8"/>
+          <circle cx="357" cy="130" r="2.2" fill="#7ac8ff"/>
+          <text x="305" y="303" text-anchor="middle" fill="#7ac8ff">X · MODO CRUISE</text>
+          <!-- BACK (START MISSION) -->
+          <line x1="225" y1="115" x2="215" y2="290" stroke="rgba(59,184,224,0.6)" stroke-width="0.8"/>
+          <circle cx="225" cy="115" r="2.2" fill="#3bb8e0"/>
+          <text x="215" y="303" text-anchor="middle" fill="#3bb8e0">BACK · INICIAR</text>
+          <!-- START (RTL) -->
+          <line x1="295" y1="115" x2="375" y2="290" stroke="rgba(242,166,35,0.6)" stroke-width="0.8"/>
+          <circle cx="295" cy="115" r="2.2" fill="#f2a623"/>
+          <text x="375" y="303" text-anchor="middle" fill="#f2a623">START · RTL</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- ── Equivalencias de teclado (compacto) ─────────────────── -->
+    <div class="settings-section-title">EQUIVALENCIAS DE TECLADO</div>
+    <div class="keys-grid">
+      <div class="key-row"><span class="key-cap">Space</span><span class="key-desc">Armar</span></div>
+      <div class="key-row"><span class="key-cap">Backspace</span><span class="key-desc">Desarmar</span></div>
+      <div class="key-row"><span class="key-cap">T</span><span class="key-desc">Iniciar misión</span></div>
+      <div class="key-row"><span class="key-cap">W A S D</span><span class="key-desc">Cabeceo / Alabeo</span></div>
+      <div class="key-row"><span class="key-cap">↑ ↓</span><span class="key-desc">Throttle ±</span></div>
+      <div class="key-row"><span class="key-cap">← →</span><span class="key-desc">Guiñada</span></div>
+      <div class="key-row"><span class="key-cap">F</span><span class="key-desc">FBWA / Loiter</span></div>
+      <div class="key-row"><span class="key-cap">C</span><span class="key-desc">CRUISE / Alt Hold</span></div>
+      <div class="key-row"><span class="key-cap">R</span><span class="key-desc">RTL</span></div>
+      <div class="key-row"><span class="key-cap">V</span><span class="key-desc">Cámara</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DEBRIEF MODAL (Fase 9) ════════════════════════════════════════════════ -->
+<div class="debrief-overlay hidden" id="debriefOverlay">
+  <div class="debrief-card">
+    <div class="debrief-stamp">MISSION COMPLETE</div>
+    <div class="debrief-title">MISIÓN COMPLETADA</div>
+    <div class="debrief-zone" id="debriefZone">—</div>
+    <div class="debrief-category" id="debriefCategory"></div>
+    <table class="debrief-table">
+      <tr><td>Tiempo de misión</td><td id="dTime">—</td><td id="dTimeStars">☆☆☆</td></tr>
+      <tr><td>Focos geofenced</td><td id="dFires">—</td><td id="dFiresStars">☆☆☆</td></tr>
+      <tr><td>Área cubierta</td>   <td id="dArea">—</td> <td id="dAreaStars">☆☆☆</td></tr>
+      <tr><td>Extinción lograda</td><td id="dExtinct">—</td><td id="dExtinctStars">☆☆☆</td></tr>
+    </table>
+    <div class="debrief-score">
+      <span style="opacity:.5;font-size:13px;letter-spacing:.1em">PUNTUACIÓN TOTAL</span><br>
+      <span id="debriefScore">0</span>&thinsp;<span style="font-size:18px;opacity:.55">pts</span>
+    </div>
+    <div class="debrief-btns">
+      <button class="debrief-btn" id="btnNewMission">▶ NUEVA MISIÓN</button>
+      <button class="debrief-btn debrief-btn-sec" id="btnMainMenu">⌂ MENÚ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SITL LOADING OVERLAY ════════════════════════════════════════════════ -->
+<div class="sitl-overlay hidden" id="sitlOverlay">
+  <div class="sitl-card">
+    <div class="sitl-radar">
+      <div class="sitl-radar-sweep"></div>
+      <div class="sitl-radar-ring"></div>
+      <div class="sitl-radar-ring sitl-radar-ring-2"></div>
+      <div class="sitl-radar-ring sitl-radar-ring-3"></div>
+      <div class="sitl-radar-cross"></div>
+    </div>
+    <div class="sitl-title">PREPARANDO DRON SIMULADO</div>
+    <div class="sitl-subtitle">MAVLink handshake · esperando heartbeat</div>
+    <div class="sitl-progress">
+      <div class="sitl-progress-fill" id="sitlProgressFill"></div>
+    </div>
+    <div class="sitl-log" id="sitlLog"></div>
+  </div>
+</div>
+
+<!-- ═══ SCRIPTS ══════════════════════════════════════════════════════════════ -->
+<script src="../../assets/sounds/audio.js"></script>
+<script src="../../services/control.js"></script>
+<script src="../../components/hud/hud.js"></script>
+<script src="../../components/gamepad/gamepad.js"></script>
+<script src="../../components/geofence/geofence_draw.js"></script>
+<script src="../../components/swarm/swarm_renderer.js"></script>
+<script src="simulator.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galicia Wildfire — Planificación</title>
+
+  <!-- MapLibre GL JS 4.7.1 -->
+  <link  href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- Tipografía -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+
+  <!-- Config global y estilos -->
+  <script src="../../config.js"></script>
+  <link  rel="stylesheet" href="planning.css">
+</head>
+<body>
+
+<div class="planning-layout">
+
+  <!-- ═══════════════════════════════════════════
+       PANEL IZQUIERDO (380px fijo)
+       ═══════════════════════════════════════════ -->
+  <aside class="left-panel" id="leftPanel">
+
+    <!-- Header -->
+    <header class="panel-header">
+      <div class="header-brand">
+        <!-- Llama SVG pequeña -->
+        <svg width="18" height="22" viewBox="0 0 18 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M9,2 C6,6 4,10 7,13 C5,12 4,15 6,17 C7,15 8,17 9,19 C10,17 11,15 12,17 C14,15 13,12 11,13 C14,10 12,6 9,2 Z"
+                fill="url(#hFlame)" />
+          <defs>
+            <linearGradient id="hFlame" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stop-color="#c0392b"/>
+              <stop offset="60%" stop-color="#e85d24"/>
+              <stop offset="100%" stop-color="#f2a623"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="header-title">GALICIA WILDFIRE</span>
+      </div>
+      <div class="backend-badge" id="backendBadge" title="Estado del backend">
+        <span class="badge-dot" id="badgeDot"></span>
+        <span class="badge-text" id="badgeText">Conectando</span>
+        <span class="badge-fleet" id="fleetCount"></span>
+      </div>
+    </header>
+
+    <!-- Tab bar -->
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="tabMission" data-tab="mission">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:5px;vertical-align:-1px" aria-hidden="true">
+          <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="5.5" y1="1" x2="5.5" y2="5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <line x1="5.5" y1="5.5" x2="8.5" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        MISIÓN
+      </button>
+      <button class="panel-tab" id="tabFleet" data-tab="fleet">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:5px;vertical-align:-1px" aria-hidden="true">
+          <rect x="1" y="4" width="9" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+          <path d="M3 4V3a2 2 0 0 1 5 0v1" stroke="currentColor" stroke-width="1.1"/>
+          <circle cx="3.5" cy="6.5" r="0.8" fill="currentColor"/>
+          <circle cx="7.5" cy="6.5" r="0.8" fill="currentColor"/>
+        </svg>
+        FLOTA
+      </button>
+    </div>
+
+    <!-- Scroll content — MISION -->
+    <div class="panel-scroll" id="panelMission">
+
+      <!-- § Zona de operaciones -->
+      <section class="panel-section">
+        <h2 class="section-title">Zona de operaciones</h2>
+        <div class="zone-cards" id="zoneCards">
+          <!-- Renderizadas por planning.js -->
+        </div>
+      </section>
+
+      <!-- § Base de operaciones -->
+      <section class="panel-section">
+        <h2 class="section-title">Base de operaciones</h2>
+
+        <div class="base-hint" id="baseHint">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="7" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+            <line x1="8" y1="4" x2="8" y2="9"  stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="12" r="1" fill="rgba(255,255,255,0.6)"/>
+          </svg>
+          <span>Selecciona una zona y haz clic en el mapa para colocar la base</span>
+        </div>
+
+        <div class="base-coords hidden" id="baseCoords">
+          <div class="coord-grid">
+            <span class="coord-label">LAT</span>
+            <span class="coord-value mono" id="baseLat">—</span>
+            <span class="coord-label">LON</span>
+            <span class="coord-value mono" id="baseLon">—</span>
+          </div>
+          <button class="btn-ghost" id="btnMoveBase">Mover base</button>
+        </div>
+      </section>
+
+      <!-- § Condiciones meteorológicas (oculto hasta generar misión) -->
+      <section class="panel-section hidden" id="weatherSection">
+        <h2 class="section-title">Condiciones meteorológicas</h2>
+
+        <div class="weather-grid">
+          <!-- Rosa de los vientos 100×100 -->
+          <div class="wind-rose-wrap">
+            <svg id="windRoseSvg" viewBox="0 0 100 100" width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="wr-bg" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"   stop-color="rgba(232,93,36,0.04)"/>
+                  <stop offset="70%"  stop-color="rgba(255,255,255,0.02)"/>
+                  <stop offset="100%" stop-color="rgba(0,0,0,0.0)"/>
+                </radialGradient>
+              </defs>
+
+              <!-- Anillos concéntricos -->
+              <circle cx="50" cy="50" r="46" fill="url(#wr-bg)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+              <circle cx="50" cy="50" r="32" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.6"/>
+              <circle cx="50" cy="50" r="18" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.6"/>
+
+              <!-- Cono de impacto del viento (se dibuja por JS) -->
+              <path id="windImpactCone" d="" fill="rgba(232,93,36,0.14)" stroke="rgba(232,93,36,0.45)" stroke-width="0.8" stroke-dasharray="2 2"/>
+
+              <!-- Marcas cardinales -->
+              <line x1="50" y1="5"  x2="50" y2="13" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>
+              <line x1="50" y1="87" x2="50" y2="95" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>
+              <line x1="5"  y1="50" x2="13" y2="50" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>
+              <line x1="87" y1="50" x2="95" y2="50" stroke="rgba(255,255,255,0.55)" stroke-width="1.5"/>
+
+              <!-- Marcas de 22.5° (16 direcciones) -->
+              <g stroke="rgba(255,255,255,0.12)" stroke-width="0.6" fill="none">
+                <line x1="73.4" y1="21.1" x2="71.0" y2="24.0"/>
+                <line x1="85.0" y1="32.4" x2="82.0" y2="33.6"/>
+                <line x1="85.0" y1="67.6" x2="82.0" y2="66.4"/>
+                <line x1="73.4" y1="78.9" x2="71.0" y2="76.0"/>
+                <line x1="50.0" y1="88.0" x2="50.0" y2="86.0"/>
+                <line x1="26.6" y1="78.9" x2="29.0" y2="76.0"/>
+                <line x1="15.0" y1="67.6" x2="18.0" y2="66.4"/>
+                <line x1="15.0" y1="32.4" x2="18.0" y2="33.6"/>
+                <line x1="26.6" y1="21.1" x2="29.0" y2="24.0"/>
+              </g>
+
+              <!-- Letras cardinales -->
+              <text x="50" y="4"  text-anchor="middle" font-size="8" fill="#f2a623" font-family="JetBrains Mono,monospace" font-weight="700">N</text>
+              <text x="96" y="53" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)" font-family="JetBrains Mono,monospace" font-weight="700">E</text>
+              <text x="50" y="99" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)" font-family="JetBrains Mono,monospace" font-weight="700">S</text>
+              <text x="4"  y="53" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.6)" font-family="JetBrains Mono,monospace" font-weight="700">W</text>
+
+              <!-- Aguja de viento (rota por JS) -->
+              <g id="windNeedle" transform="rotate(0,50,50)">
+                <!-- Cabeza (naranja, apunta de dónde viene el viento) -->
+                <polygon points="50,10 45,30 50,26 55,30" fill="#e85d24" stroke="#7a1818" stroke-width="0.5"/>
+                <!-- Eje -->
+                <rect x="49" y="26" width="2" height="36" fill="rgba(255,255,255,0.5)"/>
+                <!-- Cola -->
+                <polygon points="50,86 45,66 50,70 55,66" fill="rgba(255,255,255,0.35)" stroke="rgba(0,0,0,0.3)" stroke-width="0.4"/>
+                <!-- Centro (hub) -->
+                <circle cx="50" cy="50" r="4.5" fill="#e85d24" stroke="rgba(0,0,0,0.5)" stroke-width="1"/>
+                <circle cx="50" cy="50" r="1.8" fill="rgba(0,0,0,0.6)"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- Datos numéricos de viento -->
+          <div class="wind-data">
+            <div class="wind-speed-val" id="windSpeedVal">—</div>
+            <div class="wind-speed-unit">km/h</div>
+            <div class="wind-dir-val" id="windDirVal">—°</div>
+            <div class="wind-alert" id="windAlert"></div>
+          </div>
+        </div>
+
+        <!-- Focos detectados -->
+        <div class="fire-info" id="fireInfo">
+          <div class="fire-count-row">
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7,1 C5,4 3,7 5.5,9.5 C4,9 3,11 4.5,12.5 C5,11 5.5,12 7,13.5 C8.5,12 9,11 9.5,12.5 C11,11 10,9 8.5,9.5 C11,7 9,4 7,1Z"
+                    fill="#e85d24"/>
+            </svg>
+            <span id="fireCountText">—</span>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /#panelMission -->
+
+    <!-- Scroll content — FLOTA -->
+    <div class="panel-scroll hidden" id="panelFleet">
+
+      <section class="panel-section">
+        <h2 class="section-title">Estado de la flota</h2>
+        <div class="fleet-summary" id="fleetSummary">
+          <div class="fleet-stat"><span class="fleet-stat-val" id="statAvailable">—</span><span class="fleet-stat-lbl">disponibles</span></div>
+          <div class="fleet-stat"><span class="fleet-stat-val stat-warn" id="statMaintenance">—</span><span class="fleet-stat-lbl">mantenimiento</span></div>
+          <div class="fleet-stat"><span class="fleet-stat-val stat-mission" id="statMission">—</span><span class="fleet-stat-lbl">en mision</span></div>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <div class="fleet-list-header">
+          <h2 class="section-title" style="margin-bottom:0">Drones registrados</h2>
+          <button class="btn-ghost btn-sm" id="btnAddDrone">+ Añadir</button>
+        </div>
+
+        <!-- Formulario añadir dron (oculto por defecto) -->
+        <div class="fleet-add-form hidden" id="fleetAddForm">
+          <input class="fleet-input" id="fCallSign"    placeholder="Call sign (ej. GW-CISTERNA-09)" />
+          <input class="fleet-input" id="fModel"       placeholder="Modelo (ej. Tanker Alpha 2200)" />
+          <select class="fleet-input" id="fType">
+            <option value="tanker">Tanker (extincion)</option>
+            <option value="reconnaissance">Reconocimiento</option>
+          </select>
+          <div class="fleet-add-row">
+            <input class="fleet-input" id="fAutonomy"  placeholder="Autonomia (min)" type="number" min="1" max="999" />
+            <input class="fleet-input" id="fArea"      placeholder="Area mojado (m²)" type="number" min="0" />
+          </div>
+          <div class="fleet-add-actions">
+            <button class="btn-ghost btn-sm" id="btnCancelAdd">Cancelar</button>
+            <button class="btn-primary btn-sm-primary" id="btnConfirmAdd">Crear dron</button>
+          </div>
+        </div>
+
+        <!-- Tabla de drones -->
+        <div class="fleet-table-wrap" id="fleetTableWrap">
+          <table class="fleet-table" id="fleetTable">
+            <thead>
+              <tr>
+                <th>Call sign</th>
+                <th>Modelo</th>
+                <th>Estado</th>
+                <th>Aut.</th>
+                <th>Mojado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="fleetTbody">
+              <tr><td colspan="6" class="fleet-loading">Cargando flota...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div><!-- /#panelFleet -->
+
+    <!-- Acciones fijas en la parte inferior -->
+    <div class="panel-actions">
+      <button class="btn-primary" id="btnGenerate" disabled>
+        <span class="btn-icon">▶</span> GENERAR MISIÓN
+      </button>
+      <button class="btn-primary btn-start hidden" id="btnStart">
+        <span class="btn-icon">▶</span> INICIAR MISIÓN
+      </button>
+    </div>
+
+  </aside><!-- /.left-panel -->
+
+  <!-- ═══════════════════════════════════════════
+       COLUMNA DERECHA: MAPA
+       ═══════════════════════════════════════════ -->
+  <div class="map-container" id="mapContainer">
+    <div id="map"></div>
+
+    <!-- Botón toggle PNOA (esquina superior derecha del mapa) -->
+    <button class="map-control-btn" id="btnPNOA" title="Activar/desactivar ortofoto PNOA">
+      PNOA
+    </button>
+
+    <!-- Toast de notificación -->
+    <div class="map-toast hidden" id="mapToast"></div>
+  </div>
+
+</div><!-- /.planning-layout -->
+
+<script src="planning.js"></script>
+</body>
+</html>
